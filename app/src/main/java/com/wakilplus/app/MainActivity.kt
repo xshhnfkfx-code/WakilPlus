@@ -294,7 +294,91 @@ fun saveSocialPayments(context: Context, list: List<SocialPayment>) {
     }
     prefs(context).edit().putString(SOCIAL_PAYMENTS_KEY, array.toString()).apply()
 }
+fun loadDebtRecords(context: Context): List<DebtRecord> {
+    return try {
+        val array = JSONArray(
+            prefs(context).getString(DEBT_RECORDS_KEY, "[]")
+        )
+        val result = mutableListOf<DebtRecord>()
 
+        for (i in 0 until array.length()) {
+            val o = array.getJSONObject(i)
+            result.add(
+                DebtRecord(
+                    o.optLong("id"),
+                    o.optString("cardNumber"),
+                    o.optString("familyName"),
+                    o.optString("description"),
+                    o.optString("date"),
+                    o.optDouble("amount")
+                )
+            )
+        }
+        result
+    } catch (_: Exception) {
+        emptyList()
+    }
+}
+
+fun saveDebtRecords(context: Context, list: List<DebtRecord>) {
+    val array = JSONArray()
+    list.forEach {
+        val o = JSONObject()
+        o.put("id", it.id)
+        o.put("cardNumber", it.cardNumber)
+        o.put("familyName", it.familyName)
+        o.put("description", it.description)
+        o.put("date", it.date)
+        o.put("amount", it.amount)
+        array.put(o)
+    }
+    prefs(context).edit()
+        .putString(DEBT_RECORDS_KEY, array.toString())
+        .apply()
+}
+
+fun loadDebtPayments(context: Context): List<DebtPayment> {
+    return try {
+        val array = JSONArray(
+            prefs(context).getString(DEBT_PAYMENTS_KEY, "[]")
+        )
+        val result = mutableListOf<DebtPayment>()
+
+        for (i in 0 until array.length()) {
+            val o = array.getJSONObject(i)
+            result.add(
+                DebtPayment(
+                    o.optLong("id"),
+                    o.optString("cardNumber"),
+                    o.optString("familyName"),
+                    o.optString("date"),
+                    o.optDouble("amount"),
+                    o.optString("note")
+                )
+            )
+        }
+        result
+    } catch (_: Exception) {
+        emptyList()
+    }
+}
+
+fun saveDebtPayments(context: Context, list: List<DebtPayment>) {
+    val array = JSONArray()
+    list.forEach {
+        val o = JSONObject()
+        o.put("id", it.id)
+        o.put("cardNumber", it.cardNumber)
+        o.put("familyName", it.familyName)
+        o.put("date", it.date)
+        o.put("amount", it.amount)
+        o.put("note", it.note)
+        array.put(o)
+    }
+    prefs(context).edit()
+        .putString(DEBT_PAYMENTS_KEY, array.toString())
+        .apply()
+}
 fun deliveredAmount(
     deliveries: List<FoodDelivery>,
     card: String,
