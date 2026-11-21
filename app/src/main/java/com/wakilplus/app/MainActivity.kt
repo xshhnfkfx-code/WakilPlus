@@ -1,4 +1,6 @@
 package com.wakilplus.app
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalLayoutDirection
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
