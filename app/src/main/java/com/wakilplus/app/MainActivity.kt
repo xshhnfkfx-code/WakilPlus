@@ -458,7 +458,7 @@ val debtPayments = remember {
     var socialFamily by remember { mutableStateOf<Beneficiary?>(null) }
     var editingSocial by remember { mutableStateOf<SocialCase?>(null) }
     var showSocialForm by remember { mutableStateOf(false) }
-    var paymentCase by remember { mutableStateOf<SocialCase?>(null) 
+    var paymentCase by remember { mutableStateOf<SocialCase?>(null) }
     var debtFamily by remember { mutableStateOf<Beneficiary?>(null) }
 var debtAction by remember { mutableStateOf("") }
     val sections = listOf(
