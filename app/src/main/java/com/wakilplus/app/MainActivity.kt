@@ -484,8 +484,7 @@ fun WakilPlusApp() {
     editingSocial = social
     showSocialForm = true
 },
-                            },
-                            onPay = { paymentCase = it },
+onPay = { paymentCase = it },
                             modifier = Modifier.padding(padding)
                         )
 
