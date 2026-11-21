@@ -477,12 +477,13 @@ fun WakilPlusApp() {
                                 editingSocial = null
                                 showSocialForm = true
                             },
-                            onEdit = {
-                                socialFamily = beneficiaries.find {
-                                    it.cardNumber == it.cardNumber
-                                }
-                                editingSocial = it
-                                showSocialForm = true
+                            onEdit = { social ->
+    socialFamily = beneficiaries.find {
+        it.cardNumber == social.cardNumber
+    }
+    editingSocial = social
+    showSocialForm = true
+},
                             },
                             onPay = { paymentCase = it },
                             modifier = Modifier.padding(padding)
