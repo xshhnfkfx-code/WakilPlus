@@ -1182,7 +1182,6 @@ fun SocialScreen(
 }
 
 @Composable
-@Composable
 fun SocialPaymentForm(
     social: SocialCase,
     paid: Double,
