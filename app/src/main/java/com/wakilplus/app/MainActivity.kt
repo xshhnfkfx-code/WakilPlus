@@ -1315,6 +1315,73 @@ fun DebtScreen(
         }
     }
 }
+
+@Composable
+fun DebtRecordForm(
+    family: Beneficiary,
+    onDismiss: () -> Unit,
+    onSave: (DebtRecord) -> Unit
+) {
+    var description by remember { mutableStateOf("") }
+    var amount by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("تسجيل دين جديد") },
+        text = {
+            Column {
+                Text("العائلة: ${family.name}")
+                Text("رقم البطاقة: ${family.cardNumber}")
+
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("وصف الدين") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = amount,
+                    onValueChange = { amount = it },
+                    label = { Text("المبلغ") },
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Decimal
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = description.isNotBlank() &&
+                    (amount.toDoubleOrNull() ?: 0.0) > 0,
+                onClick = {
+                    onSave(
+                        DebtRecord(
+                            id = System.currentTimeMillis(),
+                            cardNumber = family.cardNumber,
+                            familyName = family.name,
+                            description = description.trim(),
+                            date = SimpleDateFormat(
+                                "yyyy/MM/dd - HH:mm",
+                                Locale.getDefault()
+                            ).format(Date()),
+                            amount = amount.toDouble()
+                        )
+                    )
+                }
+            ) {
+                Text("حفظ")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("إلغاء")
+            }
+        }
+    )
+}
+
     val totalEntitlements = cases.sumOf { it.monthlyAmount }
     val totalPaid = cases.sumOf { socialPaid(payments, it.cardNumber) }
 
