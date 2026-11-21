@@ -1189,6 +1189,13 @@ fun SocialScreen(
     onPay: (SocialCase) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    fun debtTotal(records: List<DebtRecord>, card: String): Double {
+    return records.filter { it.cardNumber == card }.sumOf { it.amount }
+}
+
+fun debtPaid(payments: List<DebtPayment>, card: String): Double {
+    return payments.filter { it.cardNumber == card }.sumOf { it.amount }
+}
     val totalEntitlements = cases.sumOf { it.monthlyAmount }
     val totalPaid = cases.sumOf { socialPaid(payments, it.cardNumber) }
 
