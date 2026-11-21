@@ -1257,3 +1257,107 @@ fun SocialPaymentForm(
         }
     )
 }
+@Composable
+fun SocialCaseForm(
+    beneficiaries: List<Beneficiary>,
+    existing: SocialCase?,
+    onDismiss: () -> Unit,
+    onSave: (SocialCase) -> Unit
+) {
+    var cardNumber by remember(existing) {
+        mutableStateOf(existing?.cardNumber ?: "")
+    }
+
+    var familyName by remember(existing) {
+        mutableStateOf(existing?.familyName ?: "")
+    }
+
+    var monthlyAmount by remember(existing) {
+        mutableStateOf(
+            existing?.monthlyAmount?.let { quantityText(it) } ?: ""
+        )
+    }
+
+    val matchingFamily = beneficiaries.find {
+        it.cardNumber == cardNumber.trim()
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                if (existing == null)
+                    "إضافة مستفيد للرعاية الاجتماعية"
+                else
+                    "تعديل الاستحقاق الاجتماعي"
+            )
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                OutlinedTextField(
+                    value = cardNumber,
+                    onValueChange = { value ->
+                        cardNumber = value
+                        val family = beneficiaries.find {
+                            it.cardNumber == value.trim()
+                        }
+                        if (family != null) {
+                            familyName = family.name
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("رقم البطاقة التموينية") },
+                    singleLine = true
+                )
+
+                if (matchingFamily != null) {
+                    Text(
+                        "العائلة المسجلة: ${matchingFamily.name}",
+                        color = Color(0xFF168B68)
+                    )
+                }
+
+                OutlinedTextField(
+                    value = familyName,
+                    onValueChange = { familyName = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("اسم رب الأسرة") },
+                    singleLine = true
+                )
+
+                OutlinedTextField(
+                    value = monthlyAmount,
+                    onValueChange = { monthlyAmount = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("الاستحقاق الشهري") },
+                    singleLine = true
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                enabled = cardNumber.isNotBlank() &&
+                    familyName.isNotBlank() &&
+                    (monthlyAmount.toDoubleOrNull() ?: 0.0) > 0,
+                onClick = {
+                    val socialCase = SocialCase(
+                        id = existing?.id ?: System.currentTimeMillis(),
+                        cardNumber = cardNumber.trim(),
+                        familyName = familyName.trim(),
+                        monthlyAmount = monthlyAmount.toDoubleOrNull() ?: 0.0
+                    )
+                    onSave(socialCase)
+                }
+            ) {
+                Text("حفظ البيانات")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("إلغاء")
+            }
+        }
+    )
+}
