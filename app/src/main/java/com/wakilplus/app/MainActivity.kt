@@ -1196,6 +1196,124 @@ fun SocialScreen(
 fun debtPaid(payments: List<DebtPayment>, card: String): Double {
     return payments.filter { it.cardNumber == card }.sumOf { it.amount }
 }
+@Composable
+fun DebtScreen(
+    beneficiaries: List<Beneficiary>,
+    records: List<DebtRecord>,
+    payments: List<DebtPayment>,
+    onAddDebt: (Beneficiary) -> Unit,
+    onPayDebt: (Beneficiary) -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val totalDebt = records.sumOf { it.amount }
+    val totalPaid = payments.sumOf { it.amount }
+    val remaining = (totalDebt - totalPaid).coerceAtLeast(0.0)
+
+    Column(
+        modifier.fillMaxSize().padding(14.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "الديون والحسابات",
+                fontSize = 21.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+            TextButton(onClick = onBack) {
+                Text("الرئيسية")
+            }
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = Color(0xFF2878C7)
+            )
+        ) {
+            Column(Modifier.padding(16.dp)) {
+                Text("إجمالي الديون: ${quantityText(totalDebt)}", color = Color.White)
+                Text("إجمالي المدفوع: ${quantityText(totalPaid)}", color = Color.White)
+                Text(
+                    "المتبقي: ${quantityText(remaining)}",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp
+                )
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        Text(
+            "حسابات العوائل",
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold
+        )
+
+        LazyColumn(
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(beneficiaries, key = { it.id }) { family ->
+                val debt = debtTotal(records, family.cardNumber)
+                val paid = debtPaid(payments, family.cardNumber)
+                val balance = (debt - paid).coerceAtLeast(0.0)
+
+                Card(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(Modifier.padding(12.dp)) {
+                        Text(
+                            family.name,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 17.sp
+                        )
+                        Text("رقم البطاقة: ${family.cardNumber}")
+                        Text("إجمالي الدين: ${quantityText(debt)}")
+                        Text("المدفوع: ${quantityText(paid)}")
+                        Text(
+                            "المتبقي: ${quantityText(balance)}",
+                            color = if (balance > 0) Color.Red
+                            else Color(0xFF168B68)
+                        )
+
+                        Row {
+                            TextButton(
+                                onClick = { onAddDebt(family) }
+                            ) {
+                                Text("＋ تسجيل دين")
+                            }
+
+                            TextButton(
+                                enabled = balance > 0,
+                                onClick = { onPayDebt(family) }
+                            ) {
+                                Text("تسجيل تسديد")
+                            }
+                        }
+
+                        val history = records.filter {
+                            it.cardNumber == family.cardNumber
+                        }
+
+                        if (history.isNotEmpty()) {
+                            Divider()
+                            Text(
+                                "سجل الديون",
+                                fontWeight = FontWeight.Bold
+                            )
+                            history.sortedByDescending { it.id }.forEach {
+                                Text(
+                                    "${it.date} • ${it.description} • ${quantityText(it.amount)}"
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
     val totalEntitlements = cases.sumOf { it.monthlyAmount }
     val totalPaid = cases.sumOf { socialPaid(payments, it.cardNumber) }
 
