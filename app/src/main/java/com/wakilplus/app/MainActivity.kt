@@ -1323,6 +1323,76 @@ fun DebtRecordForm(
     onDismiss: () -> Unit,
     onSave: (DebtRecord) -> Unit
 ) {
+    @Composable
+fun DebtPaymentForm(
+    family: Beneficiary,
+    paid: Double,
+    debt: Double,
+    onDismiss: () -> Unit,
+    onSave: (DebtPayment) -> Unit
+) {
+    var amount by remember { mutableStateOf("") }
+    var note by remember { mutableStateOf("") }
+
+    val remaining = (debt - paid).coerceAtLeast(0.0)
+    val enteredAmount = amount.toDoubleOrNull() ?: 0.0
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("تسجيل تسديد دين") },
+        text = {
+            Column {
+                Text("العائلة: ${family.name}")
+                Text("المتبقي: ${quantityText(remaining)}")
+
+                OutlinedTextField(
+                    value = amount,
+                    onValueChange = { amount = it },
+                    label = { Text("مبلغ التسديد") },
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Decimal
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = note,
+                    onValueChange = { note = it },
+                    label = { Text("ملاحظة (اختياري)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = enteredAmount > 0 &&
+                    enteredAmount <= remaining,
+                onClick = {
+                    onSave(
+                        DebtPayment(
+                            id = System.currentTimeMillis(),
+                            cardNumber = family.cardNumber,
+                            familyName = family.name,
+                            date = SimpleDateFormat(
+                                "yyyy/MM/dd - HH:mm",
+                                Locale.getDefault()
+                            ).format(Date()),
+                            amount = enteredAmount,
+                            note = note.trim()
+                        )
+                    )
+                }
+            ) {
+                Text("حفظ التسديد")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("إلغاء")
+            }
+        }
+    )
+}
     var description by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
 
