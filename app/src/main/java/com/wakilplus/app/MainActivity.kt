@@ -74,102 +74,92 @@ data class FoodDelivery(
     val lines: List<DeliveryLine>
 )
 
-private const val BENEFICIARIES_KEY = "wakilplus_beneficiaries"
-private const val FOOD_ITEMS_KEY = "wakilplus_food_items"
-private const val FOOD_DELIVERIES_KEY = "wakilplus_food_deliveries"
+const val BENEFICIARIES_KEY = "wakilplus_beneficiaries"
+const val FOOD_ITEMS_KEY = "wakilplus_food_items"
+const val FOOD_DELIVERIES_KEY = "wakilplus_food_deliveries"
+const val FLOUR_ITEMS_KEY = "wakilplus_flour_items"
+const val FLOUR_DELIVERIES_KEY = "wakilplus_flour_deliveries"
 
-fun appPreferences(context: Context) =
+fun prefs(context: Context) =
     context.getSharedPreferences("WakilPlusData", Context.MODE_PRIVATE)
 
 fun loadBeneficiaries(context: Context): List<Beneficiary> {
     return try {
-        val array = JSONArray(
-            appPreferences(context).getString(BENEFICIARIES_KEY, "[]")
-        )
+        val array = JSONArray(prefs(context).getString(BENEFICIARIES_KEY, "[]"))
         val result = mutableListOf<Beneficiary>()
         for (i in 0 until array.length()) {
-            val item = array.getJSONObject(i)
+            val o = array.getJSONObject(i)
             result.add(
                 Beneficiary(
-                    item.optLong("id"),
-                    item.optString("name"),
-                    item.optString("address"),
-                    item.optString("phone"),
-                    item.optString("members"),
-                    item.optString("cardNumber"),
-                    item.optString("nfc")
+                    o.optLong("id"),
+                    o.optString("name"),
+                    o.optString("address"),
+                    o.optString("phone"),
+                    o.optString("members"),
+                    o.optString("cardNumber"),
+                    o.optString("nfc")
                 )
             )
         }
         result
-    } catch (_: Exception) {
-        emptyList()
-    }
+    } catch (_: Exception) { emptyList() }
 }
 
 fun saveBeneficiaries(context: Context, list: List<Beneficiary>) {
     val array = JSONArray()
     list.forEach {
-        val obj = JSONObject()
-        obj.put("id", it.id)
-        obj.put("name", it.name)
-        obj.put("address", it.address)
-        obj.put("phone", it.phone)
-        obj.put("members", it.members)
-        obj.put("cardNumber", it.cardNumber)
-        obj.put("nfc", it.nfc)
-        array.put(obj)
+        val o = JSONObject()
+        o.put("id", it.id)
+        o.put("name", it.name)
+        o.put("address", it.address)
+        o.put("phone", it.phone)
+        o.put("members", it.members)
+        o.put("cardNumber", it.cardNumber)
+        o.put("nfc", it.nfc)
+        array.put(o)
     }
-    appPreferences(context).edit()
-        .putString(BENEFICIARIES_KEY, array.toString()).apply()
+    prefs(context).edit().putString(BENEFICIARIES_KEY, array.toString()).apply()
 }
 
-fun loadFoodItems(context: Context): List<FoodItem> {
+fun loadItems(context: Context, key: String): List<FoodItem> {
     return try {
-        val array = JSONArray(
-            appPreferences(context).getString(FOOD_ITEMS_KEY, "[]")
-        )
+        val array = JSONArray(prefs(context).getString(key, "[]"))
         val result = mutableListOf<FoodItem>()
         for (i in 0 until array.length()) {
-            val obj = array.getJSONObject(i)
+            val o = array.getJSONObject(i)
             result.add(
                 FoodItem(
-                    obj.optLong("id"),
-                    obj.optString("name"),
-                    obj.optString("unit"),
-                    obj.optDouble("perPerson")
+                    o.optLong("id"),
+                    o.optString("name"),
+                    o.optString("unit"),
+                    o.optDouble("perPerson")
                 )
             )
         }
         result
-    } catch (_: Exception) {
-        emptyList()
-    }
+    } catch (_: Exception) { emptyList() }
 }
 
-fun saveFoodItems(context: Context, list: List<FoodItem>) {
+fun saveItems(context: Context, key: String, list: List<FoodItem>) {
     val array = JSONArray()
     list.forEach {
-        val obj = JSONObject()
-        obj.put("id", it.id)
-        obj.put("name", it.name)
-        obj.put("unit", it.unit)
-        obj.put("perPerson", it.perPerson)
-        array.put(obj)
+        val o = JSONObject()
+        o.put("id", it.id)
+        o.put("name", it.name)
+        o.put("unit", it.unit)
+        o.put("perPerson", it.perPerson)
+        array.put(o)
     }
-    appPreferences(context).edit()
-        .putString(FOOD_ITEMS_KEY, array.toString()).apply()
+    prefs(context).edit().putString(key, array.toString()).apply()
 }
 
-fun loadFoodDeliveries(context: Context): List<FoodDelivery> {
+fun loadDeliveries(context: Context, key: String): List<FoodDelivery> {
     return try {
-        val array = JSONArray(
-            appPreferences(context).getString(FOOD_DELIVERIES_KEY, "[]")
-        )
+        val array = JSONArray(prefs(context).getString(key, "[]"))
         val result = mutableListOf<FoodDelivery>()
         for (i in 0 until array.length()) {
-            val obj = array.getJSONObject(i)
-            val linesArray = obj.optJSONArray("lines") ?: JSONArray()
+            val o = array.getJSONObject(i)
+            val linesArray = o.optJSONArray("lines") ?: JSONArray()
             val lines = mutableListOf<DeliveryLine>()
             for (j in 0 until linesArray.length()) {
                 val line = linesArray.getJSONObject(j)
@@ -183,63 +173,55 @@ fun loadFoodDeliveries(context: Context): List<FoodDelivery> {
             }
             result.add(
                 FoodDelivery(
-                    obj.optLong("id"),
-                    obj.optString("cardNumber"),
-                    obj.optString("familyName"),
-                    obj.optString("date"),
+                    o.optLong("id"),
+                    o.optString("cardNumber"),
+                    o.optString("familyName"),
+                    o.optString("date"),
                     lines
                 )
             )
         }
         result
-    } catch (_: Exception) {
-        emptyList()
-    }
+    } catch (_: Exception) { emptyList() }
 }
 
-fun saveFoodDeliveries(context: Context, list: List<FoodDelivery>) {
+fun saveDeliveries(context: Context, key: String, list: List<FoodDelivery>) {
     val array = JSONArray()
     list.forEach { delivery ->
-        val obj = JSONObject()
-        obj.put("id", delivery.id)
-        obj.put("cardNumber", delivery.cardNumber)
-        obj.put("familyName", delivery.familyName)
-        obj.put("date", delivery.date)
-
+        val o = JSONObject()
+        o.put("id", delivery.id)
+        o.put("cardNumber", delivery.cardNumber)
+        o.put("familyName", delivery.familyName)
+        o.put("date", delivery.date)
         val lines = JSONArray()
-        delivery.lines.forEach { line ->
-            val lineObj = JSONObject()
-            lineObj.put("itemId", line.itemId)
-            lineObj.put("itemName", line.itemName)
-            lineObj.put("quantity", line.quantity)
-            lines.put(lineObj)
+        delivery.lines.forEach {
+            val line = JSONObject()
+            line.put("itemId", it.itemId)
+            line.put("itemName", it.itemName)
+            line.put("quantity", it.quantity)
+            lines.put(line)
         }
-        obj.put("lines", lines)
-        array.put(obj)
+        o.put("lines", lines)
+        array.put(o)
     }
-    appPreferences(context).edit()
-        .putString(FOOD_DELIVERIES_KEY, array.toString()).apply()
+    prefs(context).edit().putString(key, array.toString()).apply()
 }
 
 fun deliveredAmount(
     deliveries: List<FoodDelivery>,
-    cardNumber: String,
+    card: String,
     itemId: Long
 ): Double {
     return deliveries
-        .filter { it.cardNumber == cardNumber }
+        .filter { it.cardNumber == card }
         .flatMap { it.lines }
         .filter { it.itemId == itemId }
         .sumOf { it.quantity }
 }
 
-fun formatQuantity(value: Double): String {
-    return if (value % 1.0 == 0.0) {
-        value.toLong().toString()
-    } else {
-        String.format(Locale.US, "%.2f", value)
-    }
-}
+fun quantityText(value: Double): String =
+    if (value % 1.0 == 0.0) value.toLong().toString()
+    else String.format(Locale.US, "%.2f", value)
 
 @Composable
 fun WakilPlusApp() {
@@ -253,23 +235,34 @@ fun WakilPlusApp() {
 
     val foodItems = remember {
         mutableStateListOf<FoodItem>().apply {
-            addAll(loadFoodItems(context))
+            addAll(loadItems(context, FOOD_ITEMS_KEY))
         }
     }
 
-    val deliveries = remember {
+    val foodDeliveries = remember {
         mutableStateListOf<FoodDelivery>().apply {
-            addAll(loadFoodDeliveries(context))
+            addAll(loadDeliveries(context, FOOD_DELIVERIES_KEY))
         }
     }
 
-    var selectedSection by remember { mutableStateOf("") }
+    val flourItems = remember {
+        mutableStateListOf<FoodItem>().apply {
+            addAll(loadItems(context, FLOUR_ITEMS_KEY))
+        }
+    }
+
+    val flourDeliveries = remember {
+        mutableStateListOf<FoodDelivery>().apply {
+            addAll(loadDeliveries(context, FLOUR_DELIVERIES_KEY))
+        }
+    }
+
+    var section by remember { mutableStateOf("") }
     var search by remember { mutableStateOf("") }
-    var rationSearch by remember { mutableStateOf("") }
-    var showBeneficiaryForm by remember { mutableStateOf(false) }
-    var editingBeneficiary by remember { mutableStateOf<Beneficiary?>(null) }
-    var showFoodForm by remember { mutableStateOf(false) }
-    var editingFood by remember { mutableStateOf<FoodItem?>(null) }
+    var editingPerson by remember { mutableStateOf<Beneficiary?>(null) }
+    var showPersonForm by remember { mutableStateOf(false) }
+    var editingItem by remember { mutableStateOf<FoodItem?>(null) }
+    var showItemForm by remember { mutableStateOf(false) }
     var deliveryFamily by remember { mutableStateOf<Beneficiary?>(null) }
 
     val sections = listOf(
@@ -313,20 +306,20 @@ fun WakilPlusApp() {
                 }
             ) { padding ->
 
-                when (selectedSection) {
+                when (section) {
                     "المستفيدون" -> {
                         BeneficiariesScreen(
                             beneficiaries = beneficiaries,
                             search = search,
                             onSearch = { search = it },
-                            onBack = { selectedSection = "" },
+                            onBack = { section = "" },
                             onAdd = {
-                                editingBeneficiary = null
-                                showBeneficiaryForm = true
+                                editingPerson = null
+                                showPersonForm = true
                             },
                             onEdit = {
-                                editingBeneficiary = it
-                                showBeneficiaryForm = true
+                                editingPerson = it
+                                showPersonForm = true
                             },
                             onDelete = {
                                 beneficiaries.remove(it)
@@ -336,31 +329,71 @@ fun WakilPlusApp() {
                         )
                     }
 
-                    "الحصة الغذائية" -> {
-                        FoodSectionScreen(
+                    "الحصة الغذائية", "مادة الطحين" -> {
+                        val isFlour = section == "مادة الطحين"
+                        val itemsList = if (isFlour) flourItems else foodItems
+                        val deliveryList =
+                            if (isFlour) flourDeliveries else foodDeliveries
+                        val itemKey =
+                            if (isFlour) FLOUR_ITEMS_KEY else FOOD_ITEMS_KEY
+                        val deliveryKey =
+                            if (isFlour) FLOUR_DELIVERIES_KEY else FOOD_DELIVERIES_KEY
+
+                        QuotaScreen(
+                            title = section,
                             beneficiaries = beneficiaries,
-                            foodItems = foodItems,
-                            deliveries = deliveries,
-                            search = rationSearch,
-                            onSearch = { rationSearch = it },
-                            onBack = { selectedSection = "" },
-                            onAddFood = {
-                                editingFood = null
-                                showFoodForm = true
+                            quotaItems = itemsList,
+                            deliveries = deliveryList,
+                            search = search,
+                            onSearch = { search = it },
+                            onBack = { section = "" },
+                            onAddItem = {
+                                editingItem = null
+                                showItemForm = true
                             },
-                            onEditFood = {
-                                editingFood = it
-                                showFoodForm = true
+                            onEditItem = {
+                                editingItem = it
+                                showItemForm = true
                             },
-                            onDeleteFood = {
-                                foodItems.remove(it)
-                                saveFoodItems(context, foodItems)
+                            onDeleteItem = {
+                                itemsList.remove(it)
+                                saveItems(context, itemKey, itemsList)
                             },
-                            onStartDelivery = {
-                                deliveryFamily = it
-                            },
+                            onStartDelivery = { deliveryFamily = it },
                             modifier = Modifier.padding(padding)
                         )
+
+                        if (showItemForm) {
+                            FoodItemForm(
+                                item = editingItem,
+                                title = if (isFlour) "مادة الطحين" else "مادة الحصة الغذائية",
+                                onDismiss = { showItemForm = false },
+                                onSave = { item ->
+                                    val index = itemsList.indexOfFirst {
+                                        it.id == item.id
+                                    }
+                                    if (index >= 0) itemsList[index] = item
+                                    else itemsList.add(item)
+                                    saveItems(context, itemKey, itemsList)
+                                    showItemForm = false
+                                }
+                            )
+                        }
+
+                        deliveryFamily?.let { family ->
+                            FoodDeliveryForm(
+                                family = family,
+                                quotaItems = itemsList.toList(),
+                                deliveries = deliveryList.toList(),
+                                title = section,
+                                onDismiss = { deliveryFamily = null },
+                                onSave = { delivery ->
+                                    deliveryList.add(delivery)
+                                    saveDeliveries(context, deliveryKey, deliveryList)
+                                    deliveryFamily = null
+                                }
+                            )
+                        }
                     }
 
                     else -> {
@@ -370,14 +403,12 @@ fun WakilPlusApp() {
                                 .padding(padding)
                                 .padding(16.dp)
                         ) {
-                            if (selectedSection.isNotEmpty()) {
-                                TextButton(
-                                    onClick = { selectedSection = "" }
-                                ) {
+                            if (section.isNotEmpty()) {
+                                TextButton(onClick = { section = "" }) {
                                     Text("← العودة للرئيسية")
                                 }
                                 Text(
-                                    selectedSection,
+                                    section,
                                     fontSize = 22.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -411,29 +442,26 @@ fun WakilPlusApp() {
                                     }
                                 }
                                 Spacer(Modifier.height(20.dp))
-                                Text(
-                                    "أقسام النظام",
-                                    fontSize = 19.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
+                                Text("أقسام النظام", fontSize = 19.sp)
                                 Spacer(Modifier.height(12.dp))
                                 LazyVerticalGrid(
                                     columns = GridCells.Fixed(2),
                                     verticalArrangement = Arrangement.spacedBy(12.dp),
                                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
-                                    gridItems(sections) { section ->
+                                    gridItems(sections) { item ->
                                         Card(
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .height(112.dp)
                                                 .clickable {
-                                                    selectedSection = section.title
+                                                    section = item.title
+                                                    search = ""
                                                 },
-                                            shape = RoundedCornerShape(16.dp),
                                             colors = CardDefaults.cardColors(
                                                 containerColor = Color.White
-                                            )
+                                            ),
+                                            shape = RoundedCornerShape(16.dp)
                                         ) {
                                             Column(
                                                 modifier = Modifier
@@ -442,13 +470,13 @@ fun WakilPlusApp() {
                                                 horizontalAlignment = Alignment.CenterHorizontally,
                                                 verticalArrangement = Arrangement.Center
                                             ) {
-                                                Text(section.icon, fontSize = 28.sp)
+                                                Text(item.icon, fontSize = 28.sp)
                                                 Spacer(Modifier.height(8.dp))
                                                 Text(
-                                                    section.title,
+                                                    item.title,
                                                     fontSize = 14.sp,
                                                     fontWeight = FontWeight.Bold,
-                                                    color = section.color
+                                                    color = item.color
                                                 )
                                             }
                                         }
@@ -460,50 +488,18 @@ fun WakilPlusApp() {
                 }
             }
 
-            if (showBeneficiaryForm) {
+            if (showPersonForm) {
                 BeneficiaryForm(
-                    person = editingBeneficiary,
-                    onDismiss = { showBeneficiaryForm = false },
+                    person = editingPerson,
+                    onDismiss = { showPersonForm = false },
                     onSave = { person ->
                         val index = beneficiaries.indexOfFirst {
                             it.id == person.id
                         }
                         if (index >= 0) beneficiaries[index] = person
                         else beneficiaries.add(person)
-
                         saveBeneficiaries(context, beneficiaries)
-                        showBeneficiaryForm = false
-                    }
-                )
-            }
-
-            if (showFoodForm) {
-                FoodItemForm(
-                    item = editingFood,
-                    onDismiss = { showFoodForm = false },
-                    onSave = { food ->
-                        val index = foodItems.indexOfFirst {
-                            it.id == food.id
-                        }
-                        if (index >= 0) foodItems[index] = food
-                        else foodItems.add(food)
-
-                        saveFoodItems(context, foodItems)
-                        showFoodForm = false
-                    }
-                )
-            }
-
-            deliveryFamily?.let { family ->
-                FoodDeliveryForm(
-                    family = family,
-                    foodItems = foodItems.toList(),
-                    deliveries = deliveries.toList(),
-                    onDismiss = { deliveryFamily = null },
-                    onSave = { delivery ->
-                        deliveries.add(delivery)
-                        saveFoodDeliveries(context, deliveries)
-                        deliveryFamily = null
+                        showPersonForm = false
                     }
                 )
             }
@@ -523,9 +519,7 @@ fun BeneficiariesScreen(
     modifier: Modifier = Modifier
 ) {
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(14.dp)
+        modifier = modifier.fillMaxSize().padding(14.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -562,14 +556,12 @@ fun BeneficiariesScreen(
             label = { Text("ابحث بالاسم أو رقم البطاقة") },
             singleLine = true
         )
-        Spacer(Modifier.height(8.dp))
         Button(
             onClick = onAdd,
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("＋ إضافة مستفيد جديد")
         }
-        Spacer(Modifier.height(8.dp))
 
         val filtered = beneficiaries.filter {
             it.name.contains(search, true) ||
@@ -577,27 +569,17 @@ fun BeneficiariesScreen(
                 it.phone.contains(search, true)
         }
 
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items(filtered, key = { it.id }) { person ->
                 Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(13.dp)) {
-                        Text(
-                            person.name,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF126B53)
-                        )
+                    Column(Modifier.padding(12.dp)) {
+                        Text(person.name, fontWeight = FontWeight.Bold)
                         Text("العنوان: ${person.address}")
                         Text("الهاتف: ${person.phone}")
                         Text("عدد أفراد الأسرة: ${person.members}")
                         Text("رقم البطاقة: ${person.cardNumber}")
-                        if (person.nfc.isNotBlank()) {
-                            Text("رقم NFC: ${person.nfc}")
-                        }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End
-                        ) {
+                        Text("رقم NFC: ${person.nfc}")
+                        Row(horizontalArrangement = Arrangement.End) {
                             TextButton(onClick = { onEdit(person) }) {
                                 Text("تعديل")
                             }
@@ -613,27 +595,29 @@ fun BeneficiariesScreen(
 }
 
 @Composable
-fun FoodSectionScreen(
+fun QuotaScreen(
+    title: String,
     beneficiaries: List<Beneficiary>,
-    foodItems: List<FoodItem>,
+    quotaItems: List<FoodItem>,
     deliveries: List<FoodDelivery>,
     search: String,
     onSearch: (String) -> Unit,
     onBack: () -> Unit,
-    onAddFood: () -> Unit,
-    onEditFood: (FoodItem) -> Unit,
-    onDeleteFood: (FoodItem) -> Unit,
+    onAddItem: () -> Unit,
+    onEditItem: (FoodItem) -> Unit,
+    onDeleteItem: (FoodItem) -> Unit,
     onStartDelivery: (Beneficiary) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isFlour = title == "مادة الطحين"
+    val mainColor = if (isFlour) Color(0xFFD18B26) else Color(0xFF2878C7)
+
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(14.dp)
+        modifier = modifier.fillMaxSize().padding(14.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                "الحصة الغذائية",
+                title,
                 fontSize = 21.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f)
@@ -643,14 +627,12 @@ fun FoodSectionScreen(
 
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = Color(0xFF2878C7)
-            )
+            colors = CardDefaults.cardColors(containerColor = mainColor)
         ) {
             Column(Modifier.padding(14.dp)) {
-                Text("مواد الحصة الغذائية", color = Color.White)
+                Text("سجل $title", color = Color.White)
                 Text(
-                    "عدد المواد: ${foodItems.size}",
+                    "عدد المواد: ${quotaItems.size}",
                     color = Color.White,
                     fontSize = 23.sp,
                     fontWeight = FontWeight.Bold
@@ -662,48 +644,39 @@ fun FoodSectionScreen(
             }
         }
 
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(8.dp))
         Button(
-            onClick = onAddFood,
-            modifier = Modifier.fillMaxWidth()
+            onClick = onAddItem,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = mainColor)
         ) {
-            Text("＋ إضافة مادة غذائية")
+            Text("＋ إضافة مادة جديدة")
         }
 
-        Text(
-            "المواد المسجلة",
-            fontWeight = FontWeight.Bold,
-            fontSize = 18.sp
-        )
-
-        if (foodItems.isEmpty()) {
-            Text(
-                "لم تتم إضافة مواد بعد. أضف المواد وحدد استحقاق الفرد الواحد.",
-                modifier = Modifier.padding(vertical = 10.dp)
-            )
+        Text("المواد المسجلة", fontWeight = FontWeight.Bold)
+        if (quotaItems.isEmpty()) {
+            Text("لم تتم إضافة مواد بعد.")
         } else {
             LazyColumn(
-                modifier = Modifier.heightIn(max = 220.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                modifier = Modifier.heightIn(max = 190.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
             ) {
-                items(foodItems, key = { it.id }) { food ->
+                items(quotaItems, key = { it.id }) { item ->
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(10.dp),
+                            modifier = Modifier.fillMaxWidth().padding(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(Modifier.weight(1f)) {
-                                Text(food.name, fontWeight = FontWeight.Bold)
+                                Text(item.name, fontWeight = FontWeight.Bold)
                                 Text(
-                                    "استحقاق الفرد: ${formatQuantity(food.perPerson)} ${food.unit}"
+                                    "استحقاق الفرد: ${quantityText(item.perPerson)} ${item.unit}"
                                 )
                             }
-                            TextButton(onClick = { onEditFood(food) }) {
+                            TextButton(onClick = { onEditItem(item) }) {
                                 Text("تعديل")
                             }
-                            TextButton(onClick = { onDeleteFood(food) }) {
+                            TextButton(onClick = { onDeleteItem(item) }) {
                                 Text("حذف", color = Color.Red)
                             }
                         }
@@ -712,26 +685,25 @@ fun FoodSectionScreen(
             }
         }
 
-        Divider(Modifier.padding(vertical = 10.dp))
-
+        Divider(Modifier.padding(vertical = 8.dp))
         Text(
-            "تسجيل تسليم عائلة",
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold
+            "سجل مستفيدي ${if (isFlour) "الطحين" else "الحصة الغذائية"}",
+            fontWeight = FontWeight.Bold,
+            fontSize = 17.sp
         )
 
         OutlinedTextField(
             value = search,
             onValueChange = onSearch,
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("ابحث برقم البطاقة التموينية أو الاسم") },
+            label = { Text("ابحث بالاسم أو رقم البطاقة التموينية") },
             singleLine = true
         )
 
         val matches = beneficiaries.filter {
             search.isNotBlank() && (
-                it.cardNumber.contains(search, true) ||
-                    it.name.contains(search, true)
+                it.name.contains(search, true) ||
+                    it.cardNumber.contains(search, true)
                 )
         }
 
@@ -742,9 +714,7 @@ fun FoodSectionScreen(
             items(matches, key = { it.id }) { family ->
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(10.dp),
+                        modifier = Modifier.fillMaxWidth().padding(10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(Modifier.weight(1f)) {
@@ -753,8 +723,11 @@ fun FoodSectionScreen(
                             Text("أفراد الأسرة: ${family.members}")
                         }
                         Button(
-                            enabled = foodItems.isNotEmpty(),
-                            onClick = { onStartDelivery(family) }
+                            enabled = quotaItems.isNotEmpty(),
+                            onClick = { onStartDelivery(family) },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = mainColor
+                            )
                         ) {
                             Text("تسليم")
                         }
@@ -772,59 +745,54 @@ fun FoodSectionScreen(
 @Composable
 fun FoodItemForm(
     item: FoodItem?,
+    title: String,
     onDismiss: () -> Unit,
     onSave: (FoodItem) -> Unit
 ) {
     var name by remember(item) { mutableStateOf(item?.name ?: "") }
     var unit by remember(item) { mutableStateOf(item?.unit ?: "كغم") }
-    var perPerson by remember(item) {
-        mutableStateOf(
-            item?.perPerson?.let { formatQuantity(it) } ?: ""
-        )
+    var amount by remember(item) {
+        mutableStateOf(item?.perPerson?.let { quantityText(it) } ?: "")
     }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = {
-            Text(if (item == null) "إضافة مادة غذائية" else "تعديل المادة")
-        },
+        title = { Text(if (item == null) "إضافة مادة" else "تعديل المادة") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
+                    name,
+                    { name = it },
                     label = { Text("اسم المادة") },
                     singleLine = true
                 )
                 OutlinedTextField(
-                    value = unit,
-                    onValueChange = { unit = it },
-                    label = { Text("وحدة القياس (كغم، لتر، علبة...)") },
+                    unit,
+                    { unit = it },
+                    label = { Text("وحدة القياس (كغم، لتر، كيس...)") },
                     singleLine = true
                 )
                 OutlinedTextField(
-                    value = perPerson,
-                    onValueChange = { perPerson = it },
+                    amount,
+                    { amount = it },
                     label = { Text("استحقاق الفرد الواحد") },
                     singleLine = true
                 )
-                Text(
-                    "مثال: إذا كان استحقاق الفرد 1 كغم، فالعائلة من 5 أفراد تستحق 5 كغم."
-                )
+                Text("مثال: 1 كغم للفرد، وعائلة من 5 أفراد تستحق 5 كغم.")
             }
         },
         confirmButton = {
             Button(
                 enabled = name.isNotBlank() &&
                     unit.isNotBlank() &&
-                    (perPerson.toDoubleOrNull() ?: 0.0) > 0.0,
+                    (amount.toDoubleOrNull() ?: 0.0) > 0,
                 onClick = {
                     onSave(
                         FoodItem(
-                            id = item?.id ?: System.currentTimeMillis(),
-                            name = name.trim(),
-                            unit = unit.trim(),
-                            perPerson = perPerson.toDouble()
+                            item?.id ?: System.currentTimeMillis(),
+                            name.trim(),
+                            unit.trim(),
+                            amount.toDouble()
                         )
                     )
                 }
@@ -841,100 +809,95 @@ fun FoodItemForm(
 @Composable
 fun FoodDeliveryForm(
     family: Beneficiary,
-    foodItems: List<FoodItem>,
+    quotaItems: List<FoodItem>,
     deliveries: List<FoodDelivery>,
+    title: String,
     onDismiss: () -> Unit,
     onSave: (FoodDelivery) -> Unit
 ) {
     val memberCount = family.members.toDoubleOrNull() ?: 0.0
 
-    val quantities = remember(family.id, foodItems, deliveries) {
+    val quantities = remember(family.id, quotaItems, deliveries) {
         mutableStateMapOf<Long, String>().apply {
-            foodItems.forEach { food ->
-                val entitled = food.perPerson * memberCount
-                val alreadyDelivered = deliveredAmount(
+            quotaItems.forEach { item ->
+                val entitled = item.perPerson * memberCount
+                val delivered = deliveredAmount(
                     deliveries,
                     family.cardNumber,
-                    food.id
+                    item.id
                 )
-                val remaining = (entitled - alreadyDelivered).coerceAtLeast(0.0)
-                put(food.id, formatQuantity(remaining))
+                put(
+                    item.id,
+                    quantityText((entitled - delivered).coerceAtLeast(0.0))
+                )
             }
         }
     }
 
-    val canSave = foodItems.isNotEmpty() &&
-        foodItems.all { food ->
-            val entitled = food.perPerson * memberCount
+    val valid = quotaItems.isNotEmpty() &&
+        quotaItems.all { item ->
+            val entitled = item.perPerson * memberCount
             val already = deliveredAmount(
                 deliveries,
                 family.cardNumber,
-                food.id
+                item.id
             )
             val remaining = (entitled - already).coerceAtLeast(0.0)
-            val entered = quantities[food.id]?.toDoubleOrNull() ?: 0.0
-            entered >= 0.0 && entered <= remaining
+            val entered = quantities[item.id]?.toDoubleOrNull() ?: 0.0
+            entered >= 0 && entered <= remaining
         } &&
-        foodItems.any {
-            (quantities[it.id]?.toDoubleOrNull() ?: 0.0) > 0.0
+        quotaItems.any {
+            (quantities[it.id]?.toDoubleOrNull() ?: 0.0) > 0
         }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("تسليم الحصة الغذائية") },
+        title = { Text("تسليم $title") },
         text = {
             Column {
-                Text(
-                    family.name,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp
-                )
+                Text(family.name, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 Text("رقم البطاقة: ${family.cardNumber}")
                 Text("عدد أفراد الأسرة: ${family.members}")
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(8.dp))
 
                 LazyColumn(
                     modifier = Modifier.heightIn(max = 390.dp),
-                    verticalArrangement = Arrangement.spacedBy(9.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(foodItems, key = { it.id }) { food ->
-                        val entitlement = food.perPerson * memberCount
+                    items(quotaItems, key = { it.id }) { item ->
+                        val entitled = item.perPerson * memberCount
                         val already = deliveredAmount(
                             deliveries,
                             family.cardNumber,
-                            food.id
+                            item.id
                         )
-                        val remaining = (entitlement - already).coerceAtLeast(0.0)
+                        val remaining =
+                            (entitled - already).coerceAtLeast(0.0)
 
                         Card {
                             Column(Modifier.padding(10.dp)) {
+                                Text(item.name, fontWeight = FontWeight.Bold)
                                 Text(
-                                    food.name,
-                                    fontWeight = FontWeight.Bold
+                                    "الاستحقاق: ${quantityText(entitled)} ${item.unit}"
                                 )
                                 Text(
-                                    "الاستحقاق الكلي: ${formatQuantity(entitlement)} ${food.unit}"
+                                    "المسلّم سابقاً: ${quantityText(already)} ${item.unit}"
                                 )
                                 Text(
-                                    "المسلّم سابقاً: ${formatQuantity(already)} ${food.unit}"
-                                )
-                                Text(
-                                    "المتبقي: ${formatQuantity(remaining)} ${food.unit}",
+                                    "المتبقي: ${quantityText(remaining)} ${item.unit}",
                                     color = Color(0xFF168B68)
                                 )
                                 OutlinedTextField(
-                                    value = quantities[food.id] ?: "0",
-                                    onValueChange = {
-                                        quantities[food.id] = it
-                                    },
-                                    label = {
-                                        Text("الكمية المسلّمة الآن (${food.unit})")
-                                    },
+                                    value = quantities[item.id] ?: "0",
+                                    onValueChange = { quantities[item.id] = it },
                                     modifier = Modifier.fillMaxWidth(),
+                                    label = {
+                                        Text("الكمية المسلّمة الآن (${item.unit})")
+                                    },
                                     singleLine = true
                                 )
                                 val entered =
-                                    quantities[food.id]?.toDoubleOrNull()
+                                    quantities[item.id]?.toDoubleOrNull()
                                 if (entered != null && entered > remaining) {
                                     Text(
                                         "الكمية أكبر من المتبقي",
@@ -949,13 +912,13 @@ fun FoodDeliveryForm(
         },
         confirmButton = {
             Button(
-                enabled = canSave,
+                enabled = valid,
                 onClick = {
-                    val lines = foodItems.mapNotNull { food ->
+                    val lines = quotaItems.mapNotNull { item ->
                         val amount =
-                            quantities[food.id]?.toDoubleOrNull() ?: 0.0
-                        if (amount > 0.0) {
-                            DeliveryLine(food.id, food.name, amount)
+                            quantities[item.id]?.toDoubleOrNull() ?: 0.0
+                        if (amount > 0) {
+                            DeliveryLine(item.id, item.name, amount)
                         } else null
                     }
 
@@ -966,11 +929,11 @@ fun FoodDeliveryForm(
 
                     onSave(
                         FoodDelivery(
-                            id = System.currentTimeMillis(),
-                            cardNumber = family.cardNumber,
-                            familyName = family.name,
-                            date = date,
-                            lines = lines
+                            System.currentTimeMillis(),
+                            family.cardNumber,
+                            family.name,
+                            date,
+                            lines
                         )
                     )
                 }
@@ -979,9 +942,7 @@ fun FoodDeliveryForm(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("إلغاء")
-            }
+            TextButton(onClick = onDismiss) { Text("إلغاء") }
         }
     )
 }
@@ -1059,13 +1020,13 @@ fun BeneficiaryForm(
                 onClick = {
                     onSave(
                         Beneficiary(
-                            id = person?.id ?: System.currentTimeMillis(),
-                            name = name.trim(),
-                            address = address.trim(),
-                            phone = phone.trim(),
-                            members = members.trim(),
-                            cardNumber = cardNumber.trim(),
-                            nfc = nfc.trim()
+                            person?.id ?: System.currentTimeMillis(),
+                            name.trim(),
+                            address.trim(),
+                            phone.trim(),
+                            members.trim(),
+                            cardNumber.trim(),
+                            nfc.trim()
                         )
                     )
                 }
