@@ -437,7 +437,17 @@ fun WakilPlusApp() {
             addAll(loadSocialPayments(context))
         }
     }
+val debtRecords = remember {
+    mutableStateListOf<DebtRecord>().apply {
+        addAll(loadDebtRecords(context))
+    }
+}
 
+val debtPayments = remember {
+    mutableStateListOf<DebtPayment>().apply {
+        addAll(loadDebtPayments(context))
+    }
+}
     var section by remember { mutableStateOf("") }
     var search by remember { mutableStateOf("") }
     var editingPerson by remember { mutableStateOf<Beneficiary?>(null) }
