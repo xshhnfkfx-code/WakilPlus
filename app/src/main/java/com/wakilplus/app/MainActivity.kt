@@ -1182,112 +1182,78 @@ fun SocialScreen(
 }
 
 @Composable
-fun SocialCaseForm(
-    beneficiaries: List<Beneficiary>,
-    existing: SocialCase?,
-    onDismiss: () -> Unit,
-    onSave: (SocialCase) -> Unit
-) {
-    var search by remember(existing) {
-        mutableStateOf(existing?.familyName ?: "")
-    }
-    var selected by remember(existing) {
-        mutableStateOf(
-            beneficiaries.find {
-                it.cardNumber == existing?.cardNumber
-            }
-        )
-    }
-    var amount by remember(existing) {
-        mutableStateOf(
-            existing?.monthlyAmount?.let { quantityText(it) } ?: ""
-        )
-    }
-
-    val matches = beneficiaries.filter {
-        search.isNotBlank() && (
-            it.name.contains(search, true) ||
-                it.cardNumber.contains(search, true)
-            )
-    }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(if (existing == null) "إضافة مستفيد للرعاية" else "تعديل الاستحقاق")
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = search,
-                    onValueChange = {
-                        search = it
-                        selected = null
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("ابحث عن المستفيد بالاسم أو البطاقة") }
-                )
-
-                if (selected == null) {
-                    LazyColumn(modifier = Modifier.heightIn(max = 180.dp)) {
-                        items(matches, key = { it.id }) { person ->
-                            Text(
-                                "${person.name} - ${person.cardNumber}",
-                                modifier = Modifier.fillMaxWidth()
-                                    .clickable {
-                                        selected = person
-                                        search = person.name
-                                    }
-                                    .padding(10.dp)
-                            )
-                            Divider()
-                        }
-                    }
-                } else {
-                    Text(
-                        "المستفيد المختار: ${selected!!.name}",
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text("رقم البطاقة: ${selected!!.cardNumber}")
-                    Text("أفراد الأسرة: ${selected!!.members}")
-                }
-
-                OutlinedTextField(
-                    value = amount,
-                    onValueChange = { amount = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("مبلغ الاستحقاق الشهري") },
-                    singleLine = true
-                )
-                Text("أدخل المبلغ الشهري الخاص بهذه العائلة.")
-            }
-        },
-        confirmButton = {
-            Button(
-                enabled = selected != null &&
-                    (amount.toDoubleOrNull() ?: 0.0) > 0,
-                onClick = {
-                    val person = selected!!
-                    onSave(
-                        SocialCase(
-                            existing?.id ?: System.currentTimeMillis(),
-                            person.cardNumber,
-                            person.name,
-                            amount.toDouble()
-                        )
-                    )
-                }
-            ) { Text("حفظ الاستحقاق") }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("إلغاء") }
-        }
-    )
-}
-
 @Composable
 fun SocialPaymentForm(
     social: SocialCase,
     paid: Double,
     onDismiss: () -> Unit,
-    on
+    onSave: (SocialPayment) -> Unit
+) {
+    var amount by remember(social.id) {
+        mutableStateOf("")
+    }
+
+    val remaining = (social.monthlyAmount - paid).coerceAtLeast(0.0)
+    val entered = amount.toDoubleOrNull() ?: 0.0
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("تسجيل دفعة للرعاية الاجتماعية")
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(social.familyName, fontWeight = FontWeight.Bold)
+                Text("رقم البطاقة: ${social.cardNumber}")
+                Text("الاستحقاق الشهري: ${quantityText(social.monthlyAmount)}")
+                Text("المدفوع سابقاً: ${quantityText(paid)}")
+                Text("المتبقي: ${quantityText(remaining)}")
+
+                OutlinedTextField(
+                    value = amount,
+                    onValueChange = { amount = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("المبلغ المدفوع الآن") },
+                    singleLine = true
+                )
+
+                if (entered > remaining) {
+                    Text(
+                        "المبلغ أكبر من المتبقي",
+                        color = Color.Red
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                enabled = entered > 0 && entered <= remaining,
+                onClick = {
+                    val date = SimpleDateFormat(
+                        "yyyy/MM/dd - HH:mm",
+                        Locale.getDefault()
+                    ).format(Date())
+
+                    onSave(
+                        SocialPayment(
+                            System.currentTimeMillis(),
+                            social.cardNumber,
+                            social.familyName,
+                            date,
+                            entered
+                        )
+                    )
+                }
+            ) {
+                Text("حفظ الدفعة")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("إلغاء")
+            }
+        }
+    )
+}
