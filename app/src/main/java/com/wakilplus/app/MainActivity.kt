@@ -84,7 +84,23 @@ data class SocialPayment(
     val date: String,
     val amount: Double
 )
+data class DebtRecord(
+    val id: Long,
+    val cardNumber: String,
+    val familyName: String,
+    val description: String,
+    val date: String,
+    val amount: Double
+)
 
+data class DebtPayment(
+    val id: Long,
+    val cardNumber: String,
+    val familyName: String,
+    val date: String,
+    val amount: Double,
+    val note: String
+)
 const val BENEFICIARIES_KEY = "wakilplus_beneficiaries"
 const val FOOD_ITEMS_KEY = "wakilplus_food_items"
 const val FOOD_DELIVERIES_KEY = "wakilplus_food_deliveries"
@@ -92,7 +108,8 @@ const val FLOUR_ITEMS_KEY = "wakilplus_flour_items"
 const val FLOUR_DELIVERIES_KEY = "wakilplus_flour_deliveries"
 const val SOCIAL_CASES_KEY = "wakilplus_social_cases"
 const val SOCIAL_PAYMENTS_KEY = "wakilplus_social_payments"
-
+const val DEBT_RECORDS_KEY = "wakilplus_debt_records"
+const val DEBT_PAYMENTS_KEY = "wakilplus_debt_payments"
 fun prefs(context: Context) =
     context.getSharedPreferences("WakilPlusData", Context.MODE_PRIVATE)
 
