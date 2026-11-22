@@ -872,4 +872,49 @@ private fun SummaryCard(label: String, value: String) {
 private fun SimpleInfoScreen(title: String, message: String, onBack: () -> Unit, modifier: Modifier = Modifier) {
     Column(modifier.fillMaxSize().padding(14.dp)) {
         PageHeader(title, onBack)
-        Card(Modifier.f
+        
+Card(Modifier.fillMaxWidth()) {
+    Text(message, Modifier.padding(16.dp))
+    }
+}
+}
+
+@Composable
+private fun SettingsScreen(
+    beneficiariesCount: Int,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier.fillMaxSize().padding(14.dp)) {
+        PageHeader("الإعدادات", onBack)
+
+        SummaryCard(
+            "عدد المستفيدين المسجلين",
+            beneficiariesCount.toString()
+        )
+
+        SummaryCard(
+            "اسم التطبيق",
+            "وكيل بلس"
+        )
+
+        SummaryCard(
+            "حفظ البيانات",
+            "يتم الحفظ تلقائياً على الجهاز"
+        )
+
+        Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp)) {
+                Text(
+                    "حول التطبيق",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+                Spacer(Modifier.height(8.dp))
+                Text("وكيل بلس - نظام إدارة الوكيل التمويني")
+                Text("الإصدار 1.0")
+            }
+        }
+    }
+}
+
