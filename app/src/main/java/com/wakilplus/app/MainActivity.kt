@@ -630,6 +630,64 @@ onPay = { paymentCase = it },
                         }
                     }
 
+                    else -> {                    }
+
+                    "الديون والحسابات" -> {
+                        DebtScreen(
+                            beneficiaries = beneficiaries,
+                            records = debtRecords,
+                            payments = debtPayments,
+                            onAddDebt = { family ->
+                                debtFamily = family
+                                debtAction = "add"
+                            },
+                            onPayDebt = { family ->
+                                debtFamily = family
+                                debtAction = "pay"
+                            },
+                            onBack = { section = "" },
+                            modifier = Modifier.padding(padding)
+                        )
+
+                        debtFamily?.let { family ->
+                            if (debtAction == "add") {
+                                DebtRecordForm(
+                                    family = family,
+                                    onDismiss = {
+                                        debtFamily = null
+                                        debtAction = ""
+                                    }
+                                ) { record ->
+                                    debtRecords.add(record)
+                                    saveDebtRecords(context, debtRecords)
+                                    debtFamily = null
+                                    debtAction = ""
+                                }
+                            } else if (debtAction == "pay") {
+                                DebtPaymentForm(
+                                    family = family,
+                                    paid = debtPaid(
+                                        debtPayments,
+                                        family.cardNumber
+                                    ),
+                                    debt = debtTotal(
+                                        debtRecords,
+                                        family.cardNumber
+                                    ),
+                                    onDismiss = {
+                                        debtFamily = null
+                                        debtAction = ""
+                                    }
+                                ) { payment ->
+                                    debtPayments.add(payment)
+                                    saveDebtPayments(context, debtPayments)
+                                    debtFamily = null
+                                    debtAction = ""
+                                }
+                            }
+                        }
+                    }
+
                     else -> {
                         Column(
                             modifier = Modifier.fillMaxSize()
