@@ -346,7 +346,10 @@ fun WakilPlusApp() {
                     "التقارير" -> ReportsScreen(beneficiaries.size, foodItems.size, flourItems.size,
                         foodDeliveries.size, flourDeliveries.size, socialCases.size, debtRecords.sumOf { it.amount },
                         { section = "" }, Modifier.padding(padding))
-                    "قارئ PDF" -> SimpleInfoScreen("قارئ PDF", "هذا القسم جاهز لإضافة اختيار ملفات PDF وقراءتها في المرحلة التالية.", { section = "" }, Modifier.padding(padding))
+                    "قارئ PDF" -> PdfReaderScreen(
+    onBack = { section = "" },
+    modifier = Modifier.padding(padding)
+)
                     "سجل التحركات" -> MovementScreen(foodDeliveries + flourDeliveries, { section = "" }, Modifier.padding(padding))
                     "حافظة الملفات" -> SimpleInfoScreen("حافظة الملفات", "سيتم ربط هذا القسم بملفات التقارير والمستندات المحفوظة.", { section = "" }, Modifier.padding(padding))
                     "الإعدادات" -> SettingsScreen(beneficiaries.size, { section = "" }, Modifier.padding(padding))
@@ -926,4 +929,149 @@ private fun SettingsScreen(
         }
     }
 }
+@Composable
+private fun PdfReaderScreen(
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
+    var pdfText by remember { mutableStateOf("") }
+    var fileName by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(false) }
+
+    val filePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            isLoading = true
+            errorMessage = ""
+            fileName = uri.lastPathSegment ?: "ملف PDF"
+
+            scope.launch {
+                try {
+                    val extractedText = withContext(Dispatchers.IO) {
+                        PDFBoxResourceLoader.init(context)
+
+                        val input = context.contentResolver.openInputStream(uri)
+                            ?: throw Exception("تعذر فتح الملف")
+
+                        input.use { stream ->
+                            PDDocument.load(stream).use { document ->
+                                PDFTextStripper().getText(document)
+                            }
+                        }
+                    }
+
+                    if (extractedText.isBlank()) {
+                        errorMessage = "لم يتم العثور على نص داخل الملف. قد يكون PDF عبارة عن صور ممسوحة ضوئياً."
+                    } else {
+                        pdfText = extractedText
+
+                        prefs(context).edit()
+                            .putString("wakilplus_last_pdf_text", extractedText)
+                            .putString("wakilplus_last_pdf_name", fileName)
+                            .apply()
+                    }
+                } catch (e: Exception) {
+                    errorMessage = "حدث خطأ أثناء قراءة الملف: ${e.message ?: "خطأ غير معروف"}"
+                } finally {
+                    isLoading = false
+                }
+            }
+        }
+    }
+
+    Column(
+        modifier.fillMaxSize().padding(14.dp)
+    ) {
+        PageHeader("قارئ ملفات PDF", onBack)
+
+        Card(
+            Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = Color(0xFF126B53)
+            )
+        ) {
+            Column(Modifier.padding(16.dp)) {
+                Text(
+                    "استيراد القوائم التموينية",
+                    color = Color.White,
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Spacer(Modifier.height(6.dp))
+
+                Text(
+                    "اختر ملف PDF لاستخراج النصوص الموجودة بداخله.",
+                    color = Color.White
+                )
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        Button(
+            onClick = {
+                filePicker.launch(arrayOf("application/pdf"))
+            },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isLoading
+        ) {
+            Text("📂 اختيار ملف PDF من الهاتف")
+        }
+
+        if (isLoading) {
+            Spacer(Modifier.height(12.dp))
+            CircularProgressIndicator()
+            Text("جارٍ قراءة الملف...")
+        }
+
+        if (errorMessage.isNotBlank()) {
+            Spacer(Modifier.height(10.dp))
+            Text(
+                errorMessage,
+                color = Color.Red
+            )
+        }
+
+        if (pdfText.isNotBlank()) {
+            Spacer(Modifier.height(12.dp))
+
+            Text(
+                "الملف: $fileName",
+                fontWeight = FontWeight.Bold
+            )
+
+            Text(
+                "تم استخراج النص بنجاح",
+                color = Color(0xFF168B68),
+                fontWeight = FontWeight.Bold
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            Card(
+                Modifier.fillMaxWidth().weight(1f)
+            ) {
+                Text(
+                    text = pdfText,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(12.dp),
+                    fontSize = 14.sp
+                )
+            }
+        } else if (!isLoading) {
+            Spacer(Modifier.height(12.dp))
+            Text(
+                "لم يتم اختيار أي ملف بعد.",
+                color = Color.DarkGray
+            )
+        }
+    }
+}
