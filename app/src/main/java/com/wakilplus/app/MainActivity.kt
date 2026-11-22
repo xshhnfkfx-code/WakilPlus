@@ -1240,64 +1240,7 @@ fun BeneficiaryForm(
 }
 
 @Composable
-fun SocialScreen(
-    beneficiaries: List<Beneficiary>,
-    cases: List<SocialCase>,
-    payments: List<SocialPayment>,
-    search: String,
-    onSearch: (String) -> Unit,
-    onBack: () -> Unit,
-    onAdd: () -> Unit,
-    onEdit: (SocialCase) -> Unit,
-    onPay: (SocialCase) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    fun debtTotal(records: List<DebtRecord>, card: String): Double {
-    return records.filter { it.cardNumber == card }.sumOf { it.amount }
-}
-
-fun debtPaid(payments: List<DebtPayment>, card: String): Double {
-    return payments.filter { it.cardNumber == card }.sumOf { it.amount }
-}
-@Composable
-fun DebtScreen(
-    beneficiaries: List<Beneficiary>,
-    records: List<DebtRecord>,
-    payments: List<DebtPayment>,
-    onAddDebt: (Beneficiary) -> Unit,
-    onPayDebt: (Beneficiary) -> Unit,
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val totalDebt = records.sumOf { it.amount }
-    val totalPaid = payments.sumOf { it.amount }
-    val remaining = (totalDebt - totalPaid).coerceAtLeast(0.0)
-
-    Column(
-        modifier.fillMaxSize().padding(14.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "الديون والحسابات",
-                fontSize = 21.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f)
-            )
-            TextButton(onClick = onBack) {
-                Text("الرئيسية")
-            }
-        }
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = Color(0xFF2878C7)
-            )
-        ) {
-            Column(Modifier.padding(16.dp)) {
-                Text("إجمالي الديون: ${quantityText(totalDebt)}", color = Color.White)
-                Text("إجمالي المدفوع: ${quantityText(totalPaid)}", color = Color.White)
-                Text(
+Text(
                     "المتبقي: ${quantityText(remaining)}",
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
@@ -1584,9 +1527,362 @@ fun DebtPaymentForm(
                         Text("المبلغ المدفوع: ${quantityText(paid)}")
                         Text(
                             "المتبقي: ${quantityText(remaining)}",
+@Composable
+fun debtTotal(records: List<DebtRecord>, card: String): Double {
+    return records.filter { it.cardNumber == card }.sumOf { it.amount }
+}
+
+fun debtPaid(payments: List<DebtPayment>, card: String): Double {
+    return payments.filter { it.cardNumber == card }.sumOf { it.amount }
+}
+
+@Composable
+fun DebtScreen(
+    beneficiaries: List<Beneficiary>,
+    records: List<DebtRecord>,
+    payments: List<DebtPayment>,
+    onAddDebt: (Beneficiary) -> Unit,
+    onPayDebt: (Beneficiary) -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val totalDebt = records.sumOf { it.amount }
+    val totalPaid = payments.sumOf { it.amount }
+    val remaining = (totalDebt - totalPaid).coerceAtLeast(0.0)
+
+    Column(modifier.fillMaxSize().padding(14.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "الديون والحسابات",
+                fontSize = 21.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+            TextButton(onClick = onBack) {
+                Text("الرئيسية")
+            }
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = Color(0xFF2878C7)
+            )
+        ) {
+            Column(Modifier.padding(16.dp)) {
+                Text("إجمالي الديون: ${quantityText(totalDebt)}", color = Color.White)
+                Text("إجمالي المدفوع: ${quantityText(totalPaid)}", color = Color.White)
+                Text(
+                    "المتبقي: ${quantityText(remaining)}",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp
+                )
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        Text("حسابات العوائل", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(beneficiaries, key = { it.id }) { family ->
+                val debt = debtTotal(records, family.cardNumber)
+                val paid = debtPaid(payments, family.cardNumber)
+                val balance = (debt - paid).coerceAtLeast(0.0)
+
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(12.dp)) {
+                        Text(
+                            family.name,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 17.sp
+                        )
+                        Text("رقم البطاقة: ${family.cardNumber}")
+                        Text("إجمالي الدين: ${quantityText(debt)}")
+                        Text("المدفوع: ${quantityText(paid)}")
+                        Text(
+                            "المتبقي: ${quantityText(balance)}",
+                            color = if (balance > 0) Color.Red
+                            else Color(0xFF168B68)
+                        )
+
+                        Row {
+                            TextButton(onClick = { onAddDebt(family) }) {
+                                Text("＋ تسجيل دين")
+                            }
+                            TextButton(
+                                enabled = balance > 0,
+                                onClick = { onPayDebt(family) }
+                            ) {
+                                Text("تسجيل تسديد")
+                            }
+                        }
+
+                        val history = records.filter {
+                            it.cardNumber == family.cardNumber
+                        }
+
+                        if (history.isNotEmpty()) {
+                            Divider()
+                            Text("سجل الديون", fontWeight = FontWeight.Bold)
+                            history.sortedByDescending { it.id }.forEach {
+                                Text(
+                                    "${it.date} • ${it.description} • ${quantityText(it.amount)}"
+                                )
+                            }
+                        }
+
+                        val paymentHistory = payments.filter {
+                            it.cardNumber == family.cardNumber
+                        }
+
+                        if (paymentHistory.isNotEmpty()) {
+                            Divider()
+                            Text("سجل التسديدات", fontWeight = FontWeight.Bold)
+                            paymentHistory.sortedByDescending { it.id }.forEach {
+                                Text(
+                                    "${it.date} • ${quantityText(it.amount)} • ${it.note}"
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun DebtRecordForm(
+    family: Beneficiary,
+    onDismiss: () -> Unit,
+    onSave: (DebtRecord) -> Unit
+) {
+    var description by remember { mutableStateOf("") }
+    var amount by remember { mutableStateOf("") }
+    val entered = amount.toDoubleOrNull() ?: 0.0
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("تسجيل دين جديد") },
+        text = {
+            Column {
+                Text("العائلة: ${family.name}")
+                Text("رقم البطاقة: ${family.cardNumber}")
+
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("وصف الدين") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = amount,
+                    onValueChange = { amount = it },
+                    label = { Text("المبلغ") },
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Decimal
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = description.isNotBlank() && entered > 0,
+                onClick = {
+                    onSave(
+                        DebtRecord(
+                            id = System.currentTimeMillis(),
+                            cardNumber = family.cardNumber,
+                            familyName = family.name,
+                            description = description.trim(),
+                            date = SimpleDateFormat(
+                                "yyyy/MM/dd - HH:mm",
+                                Locale.getDefault()
+                            ).format(Date()),
+                            amount = entered
+                        )
+                    )
+                }
+            ) {
+                Text("حفظ")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("إلغاء")
+            }
+        }
+    )
+}
+
+@Composable
+fun DebtPaymentForm(
+    family: Beneficiary,
+    paid: Double,
+    debt: Double,
+    onDismiss: () -> Unit,
+    onSave: (DebtPayment) -> Unit
+) {
+    var amount by remember { mutableStateOf("") }
+    var note by remember { mutableStateOf("") }
+
+    val remaining = (debt - paid).coerceAtLeast(0.0)
+    val enteredAmount = amount.toDoubleOrNull() ?: 0.0
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("تسجيل تسديد دين") },
+        text = {
+            Column {
+                Text("العائلة: ${family.name}")
+                Text("المتبقي: ${quantityText(remaining)}")
+
+                OutlinedTextField(
+                    value = amount,
+                    onValueChange = { amount = it },
+                    label = { Text("مبلغ التسديد") },
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Decimal
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = note,
+                    onValueChange = { note = it },
+                    label = { Text("ملاحظة (اختياري)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = enteredAmount > 0 && enteredAmount <= remaining,
+                onClick = {
+                    onSave(
+                        DebtPayment(
+                            id = System.currentTimeMillis(),
+                            cardNumber = family.cardNumber,
+                            familyName = family.name,
+                            date = SimpleDateFormat(
+                                "yyyy/MM/dd - HH:mm",
+                                Locale.getDefault()
+                            ).format(Date()),
+                            amount = enteredAmount,
+                            note = note.trim()
+                        )
+                    )
+                }
+            ) {
+                Text("حفظ التسديد")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("إلغاء")
+            }
+        }
+    )
+}
+
+@Composable
+fun SocialScreen(
+    beneficiaries: List<Beneficiary>,
+    cases: List<SocialCase>,
+    payments: List<SocialPayment>,
+    search: String,
+    onSearch: (String) -> Unit,
+    onBack: () -> Unit,
+    onAdd: () -> Unit,
+    onEdit: (SocialCase) -> Unit,
+    onPay: (SocialCase) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val totalEntitlements = cases.sumOf { it.monthlyAmount }
+    val totalPaid = cases.sumOf { socialPaid(payments, it.cardNumber) }
+
+    Column(modifier.fillMaxSize().padding(14.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "الرعاية الاجتماعية",
+                fontSize = 21.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+            TextButton(onClick = onBack) {
+                Text("الرئيسية")
+            }
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = Color(0xFF8656B8)
+            )
+        ) {
+            Column(Modifier.padding(14.dp)) {
+                Text("عدد العوائل المسجلة: ${cases.size}", color = Color.White)
+                Text(
+                    "مجموع الاستحقاقات: ${quantityText(totalEntitlements)}",
+                    color = Color.White
+                )
+                Text(
+                    "مجموع المدفوعات المسجلة: ${quantityText(totalPaid)}",
+                    color = Color.White
+                )
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        Button(
+            onClick = onAdd,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color(0xFF8656B8)
+            )
+        ) {
+            Text("＋ إضافة مستفيد للرعاية الاجتماعية")
+        }
+
+        OutlinedTextField(
+            value = search,
+            onValueChange = onSearch,
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("ابحث بالاسم أو رقم البطاقة التموينية") },
+            singleLine = true
+        )
+
+        val filtered = cases.filter {
+            it.familyName.contains(search, true) ||
+                it.cardNumber.contains(search, true)
+        }
+
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(filtered, key = { it.id }) { social ->
+                val paid = socialPaid(payments, social.cardNumber)
+                val remaining = (social.monthlyAmount - paid).coerceAtLeast(0.0)
+                val family = beneficiaries.find {
+                    it.cardNumber == social.cardNumber
+                }
+
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(12.dp)) {
+                        Text(social.familyName, fontWeight = FontWeight.Bold)
+                        Text("رقم البطاقة: ${social.cardNumber}")
+                        Text("عدد أفراد الأسرة: ${family?.members ?: "غير متوفر"}")
+                        Text("الاستحقاق الشهري: ${quantityText(social.monthlyAmount)}")
+                        Text("المبلغ المدفوع: ${quantityText(paid)}")
+                        Text(
+                            "المتبقي: ${quantityText(remaining)}",
                             color = if (remaining > 0) Color(0xFFB36B12)
                             else Color(0xFF168B68)
                         )
+
                         Row {
                             TextButton(onClick = { onEdit(social) }) {
                                 Text("تعديل الاستحقاق")
@@ -1598,16 +1894,16 @@ fun DebtPaymentForm(
                                 Text("تسجيل دفعة")
                             }
                         }
+
                         val history = payments.filter {
                             it.cardNumber == social.cardNumber
                         }
+
                         if (history.isNotEmpty()) {
                             Divider()
                             Text("سجل المدفوعات", fontWeight = FontWeight.Bold)
                             history.sortedByDescending { it.id }.forEach {
-                                Text(
-                                    "${it.date}  •  ${quantityText(it.amount)}"
-                                )
+                                Text("${it.date} • ${quantityText(it.amount)}")
                             }
                         }
                     }
@@ -1637,9 +1933,7 @@ fun SocialPaymentForm(
             Text("تسجيل دفعة للرعاية الاجتماعية")
         },
         text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(social.familyName, fontWeight = FontWeight.Bold)
                 Text("رقم البطاقة: ${social.cardNumber}")
                 Text("الاستحقاق الشهري: ${quantityText(social.monthlyAmount)}")
@@ -1655,10 +1949,7 @@ fun SocialPaymentForm(
                 )
 
                 if (entered > remaining) {
-                    Text(
-                        "المبلغ أكبر من المتبقي",
-                        color = Color.Red
-                    )
+                    Text("المبلغ أكبر من المتبقي", color = Color.Red)
                 }
             }
         },
@@ -1692,6 +1983,7 @@ fun SocialPaymentForm(
         }
     )
 }
+
 @Composable
 fun SocialCaseForm(
     beneficiaries: List<Beneficiary>,
@@ -1728,9 +2020,7 @@ fun SocialCaseForm(
             )
         },
         text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(
                     value = cardNumber,
                     onValueChange = { value ->
