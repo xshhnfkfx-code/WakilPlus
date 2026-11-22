@@ -656,13 +656,14 @@ onPay = { paymentCase = it },
                                     onDismiss = {
                                         debtFamily = null
                                         debtAction = ""
+                                    },
+                                    onSave = { record ->
+                                        debtRecords.add(record)
+                                        saveDebtRecords(context, debtRecords)
+                                        debtFamily = null
+                                        debtAction = ""
                                     }
-                                ) { record ->
-                                    debtRecords.add(record)
-                                    saveDebtRecords(context, debtRecords)
-                                    debtFamily = null
-                                    debtAction = ""
-                                }
+                                )
                             } else if (debtAction == "pay") {
                                 DebtPaymentForm(
                                     family = family,
@@ -677,18 +678,20 @@ onPay = { paymentCase = it },
                                     onDismiss = {
                                         debtFamily = null
                                         debtAction = ""
+                                    },
+                                    onSave = { payment ->
+                                        debtPayments.add(payment)
+                                        saveDebtPayments(context, debtPayments)
+                                        debtFamily = null
+                                        debtAction = ""
                                     }
-                                ) { payment ->
-                                    debtPayments.add(payment)
-                                    saveDebtPayments(context, debtPayments)
-                                    debtFamily = null
-                                    debtAction = ""
-                                }
+                                )
                             }
                         }
                     }
 
                     else -> {
+
                         Column(
                             modifier = Modifier.fillMaxSize()
                                 .padding(padding).padding(16.dp)
