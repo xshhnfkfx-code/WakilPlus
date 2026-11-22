@@ -6,6 +6,7 @@
     <application
         android:allowBackup="true"
         android:label="وكيل بلس"
+        android:icon="@drawable/file_00000000d9e48211aed0cb175e77c78c"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
