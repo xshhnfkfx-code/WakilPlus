@@ -1,5 +1,5 @@
 package com.wakilplus.app
-
+import androidx.compose.foundation.horizontalScroll
 import android.os.Bundle
 import android.content.Context
 import androidx.activity.ComponentActivity
