@@ -51,7 +51,51 @@ private const val SOCIAL_CASES_KEY = "wakilplus_social_cases"
 private const val SOCIAL_PAYMENTS_KEY = "wakilplus_social_payments"
 private const val DEBT_RECORDS_KEY = "wakilplus_debt_records"
 private const val DEBT_PAYMENTS_KEY = "wakilplus_debt_payments"
+data class PdfBeneficiaryRow(
+    val name: String,
+    val cardNumber: String,
+    val totalMembers: Int,
+    val eligibleMembers: Int,
+    val blockedMembers: Int
+)
 
+private fun parsePdfFamilies(text: String): List<PdfBeneficiaryRow> {
+    val rows = mutableListOf<PdfBeneficiaryRow>()
+
+    val bidiMarks = Regex("[\\u200E\\u200F\\u202A-\\u202E\\u2066-\\u2069]")
+
+    val rowPattern = Regex(
+        """^\s*(\d+)\s+(\d+)\s+(\d+)\s+(.+?)\s+(\d{7})\s+(\d{1,7})\s+(\d+)\s*$"""
+    )
+
+    text.lineSequence().forEach { line ->
+        val cleanLine = line
+            .replace(bidiMarks, "")
+            .trim()
+
+        val match = rowPattern.matchEntire(cleanLine) ?: return@forEach
+
+        val blocked = match.groupValues[1].toIntOrNull() ?: return@forEach
+        val eligible = match.groupValues[2].toIntOrNull() ?: return@forEach
+        val total = match.groupValues[3].toIntOrNull() ?: return@forEach
+        val name = match.groupValues[4].trim()
+        val card = match.groupValues[6]
+
+        if (name.isNotBlank()) {
+            rows.add(
+                PdfBeneficiaryRow(
+                    name = name,
+                    cardNumber = card,
+                    totalMembers = total,
+                    eligibleMembers = eligible,
+                    blockedMembers = blocked
+                )
+            )
+        }
+    }
+
+    return rows
+}
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
