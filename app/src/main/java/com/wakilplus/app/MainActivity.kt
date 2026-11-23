@@ -973,7 +973,7 @@ private fun SettingsScreen(
         }
     }
 }
-            @Composable
+@Composable
 private fun PdfReaderScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier
