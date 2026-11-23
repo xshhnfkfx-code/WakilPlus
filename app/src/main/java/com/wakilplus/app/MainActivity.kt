@@ -973,7 +973,7 @@ private fun SettingsScreen(
         }
     }
 }
-@Composable
+            @Composable
 private fun PdfReaderScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier
@@ -981,7 +981,10 @@ private fun PdfReaderScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    var pdfText by remember { mutableStateOf("") }
+    var families by remember {
+        mutableStateOf<List<PdfBeneficiaryRow>>(emptyList())
+    }
+
     var fileName by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
@@ -992,11 +995,12 @@ private fun PdfReaderScreen(
         if (uri != null) {
             isLoading = true
             errorMessage = ""
+            families = emptyList()
             fileName = uri.lastPathSegment ?: "ملف PDF"
 
             scope.launch {
                 try {
-                    val extractedText = withContext(Dispatchers.IO) {
+                    val result = withContext(Dispatchers.IO) {
                         PDFBoxResourceLoader.init(context)
 
                         val input = context.contentResolver.openInputStream(uri)
@@ -1004,23 +1008,22 @@ private fun PdfReaderScreen(
 
                         input.use { stream ->
                             PDDocument.load(stream).use { document ->
-                                PDFTextStripper().getText(document)
+                                val text = PDFTextStripper().getText(document)
+                                parsePdfFamilies(text)
                             }
                         }
                     }
 
-                    if (extractedText.isBlank()) {
-                        errorMessage = "لم يتم العثور على نص داخل الملف. قد يكون PDF عبارة عن صور ممسوحة ضوئياً."
-                    } else {
-                        pdfText = extractedText
+                    families = result
 
-                        prefs(context).edit()
-                            .putString("wakilplus_last_pdf_text", extractedText)
-                            .putString("wakilplus_last_pdf_name", fileName)
-                            .apply()
+                    if (result.isEmpty()) {
+                        errorMessage =
+                            "لم يتم استخراج بيانات العوائل. تحقق من أن الملف يحتوي على نص قابل للقراءة."
                     }
+
                 } catch (e: Exception) {
-                    errorMessage = "حدث خطأ أثناء قراءة الملف: ${e.message ?: "خطأ غير معروف"}"
+                    errorMessage =
+                        "حدث خطأ أثناء قراءة الملف: ${e.message ?: "خطأ غير معروف"}"
                 } finally {
                     isLoading = false
                 }
@@ -1028,18 +1031,29 @@ private fun PdfReaderScreen(
         }
     }
 
+    val nameWidth = 210.dp
+    val cardWidth = 105.dp
+    val totalWidth = 75.dp
+    val eligibleWidth = 90.dp
+    val blockedWidth = 85.dp
+
     Column(
-        modifier.fillMaxSize().padding(14.dp)
+        modifier
+            .fillMaxSize()
+            .padding(12.dp)
     ) {
-        PageHeader("قارئ ملفات PDF", onBack)
+        PageHeader("جدول المستفيدين من PDF", onBack)
+
+        Spacer(Modifier.height(10.dp))
 
         Card(
             Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
                 containerColor = Color(0xFF126B53)
-            )
+            ),
+            shape = RoundedCornerShape(16.dp)
         ) {
-            Column(Modifier.padding(16.dp)) {
+            Column(Modifier.padding(15.dp)) {
                 Text(
                     "استيراد القوائم التموينية",
                     color = Color.White,
@@ -1047,75 +1061,282 @@ private fun PdfReaderScreen(
                     fontWeight = FontWeight.Bold
                 )
 
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(5.dp))
 
                 Text(
-                    "اختر ملف PDF لاستخراج النصوص الموجودة بداخله.",
-                    color = Color.White
+                    "استخراج أسماء المستفيدين وأرقام البطاقات وأعداد الأفراد وترتيبها في جدول.",
+                    color = Color.White,
+                    fontSize = 14.sp
                 )
             }
         }
 
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(10.dp))
 
         Button(
             onClick = {
                 filePicker.launch(arrayOf("application/pdf"))
             },
             modifier = Modifier.fillMaxWidth(),
-            enabled = !isLoading
+            enabled = !isLoading,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color(0xFF7051A5)
+            )
         ) {
             Text("📂 اختيار ملف PDF من الهاتف")
         }
 
         if (isLoading) {
             Spacer(Modifier.height(12.dp))
-            CircularProgressIndicator()
-            Text("جارٍ قراءة الملف...")
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(25.dp),
+                    color = Color(0xFF126B53)
+                )
+
+                Spacer(Modifier.width(10.dp))
+
+                Text("جارٍ استخراج وترتيب بيانات العوائل...")
+            }
         }
 
         if (errorMessage.isNotBlank()) {
             Spacer(Modifier.height(10.dp))
+
             Text(
                 errorMessage,
-                color = Color.Red
+                color = Color.Red,
+                fontWeight = FontWeight.Bold
             )
         }
 
-        if (pdfText.isNotBlank()) {
-            Spacer(Modifier.height(12.dp))
+        if (families.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
 
             Text(
                 "الملف: $fileName",
-                fontWeight = FontWeight.Bold
+                fontSize = 12.sp,
+                color = Color.DarkGray
             )
 
-            Text(
-                "تم استخراج النص بنجاح",
-                color = Color(0xFF168B68),
-                fontWeight = FontWeight.Bold
-            )
+            Card(
+                Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFFE1F2E9)
+                )
+            ) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            "إجمالي العوائل المستخرجة",
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF126B53)
+                        )
+
+                        Text(
+                            families.size.toString(),
+                            fontSize = 25.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF126B53)
+                        )
+                    }
+
+                    Text(
+                        "تم استخراج البيانات",
+                        color = Color(0xFF168B68),
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
 
             Spacer(Modifier.height(8.dp))
 
-            Card(
-                Modifier.fillMaxWidth().weight(1f)
-            ) {
-                Text(
-                    text = pdfText,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(12.dp),
-                    fontSize = 14.sp
-                )
-            }
-        } else if (!isLoading) {
-            Spacer(Modifier.height(12.dp))
             Text(
-                "لم يتم اختيار أي ملف بعد.",
+                "اسحب الجدول يميناً ويساراً لرؤية جميع الأعمدة",
+                fontSize = 12.sp,
+                color = Color.DarkGray
+            )
+
+            Spacer(Modifier.height(5.dp))
+
+            Column(
+                Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+            ) {
+                Column(
+                    Modifier
+                        .width(
+                            nameWidth +
+                                cardWidth +
+                                totalWidth +
+                                eligibleWidth +
+                                blockedWidth
+                        )
+                        .fillMaxHeight()
+                ) {
+
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xFF126B53)),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        PdfTableCell(
+                            "اسم المستفيد",
+                            nameWidth,
+                            Color(0xFF126B53),
+                            Color.White
+                        )
+
+                        PdfTableCell(
+                            "رقم البطاقة",
+                            cardWidth,
+                            Color(0xFF126B53),
+                            Color.White
+                        )
+
+                        PdfTableCell(
+                            "العدد الكلي",
+                            totalWidth,
+                            Color(0xFF126B53),
+                            Color.White
+                        )
+
+                        PdfTableCell(
+                            "المستحقون",
+                            eligibleWidth,
+                            Color(0xFF126B53),
+                            Color.White
+                        )
+
+                        PdfTableCell(
+                            "المحجوبون",
+                            blockedWidth,
+                            Color(0xFF126B53),
+                            Color.White
+                        )
+                    }
+
+                    HorizontalDivider(
+                        color = Color.White,
+                        thickness = 2.dp
+                    )
+
+                    LazyColumn(
+                        Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                    ) {
+                        items(
+                            families.size,
+                            key = { index -> index }
+                        ) { index ->
+
+                            val family = families[index]
+
+                            val rowColor =
+                                if (index % 2 == 0)
+                                    Color.White
+                                else
+                                    Color(0xFFF0F3F6)
+
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .background(rowColor),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                PdfTableCell(
+                                    family.name,
+                                    nameWidth,
+                                    rowColor,
+                                    Color.Black
+                                )
+
+                                PdfTableCell(
+                                    family.cardNumber,
+                                    cardWidth,
+                                    rowColor,
+                                    Color(0xFF126B53)
+                                )
+
+                                PdfTableCell(
+                                    family.totalMembers.toString(),
+                                    totalWidth,
+                                    rowColor,
+                                    Color.Black
+                                )
+
+                                PdfTableCell(
+                                    family.eligibleMembers.toString(),
+                                    eligibleWidth,
+                                    rowColor,
+                                    Color(0xFF168B68)
+                                )
+
+                                PdfTableCell(
+                                    family.blockedMembers.toString(),
+                                    blockedWidth,
+                                    rowColor,
+                                    if (family.blockedMembers > 0)
+                                        Color.Red
+                                    else
+                                        Color.Black
+                                )
+                            }
+
+                            HorizontalDivider(
+                                color = Color(0xFFD9DEE3),
+                                thickness = 0.6.dp
+                            )
+                        }
+                    }
+                }
+            }
+        } else if (!isLoading && errorMessage.isBlank()) {
+            Spacer(Modifier.height(15.dp))
+
+            Text(
+                "اختر ملف PDF لعرض بيانات العوائل في جدول منظم.",
                 color = Color.DarkGray
             )
         }
+    }
+}
+
+@Composable
+private fun PdfTableCell(
+    text: String,
+    width: androidx.compose.ui.unit.Dp,
+    backgroundColor: Color,
+    textColor: Color
+) {
+    Box(
+        Modifier
+            .width(width)
+            .background(backgroundColor)
+            .padding(
+                horizontal = 5.dp,
+                vertical = 10.dp
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            color = textColor,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 3
+        )
     }
 }
