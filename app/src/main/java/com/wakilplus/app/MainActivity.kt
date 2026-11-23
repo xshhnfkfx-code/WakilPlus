@@ -884,16 +884,463 @@ private fun MovementScreen(deliveries: List<FoodDelivery>, onBack: () -> Unit, m
 }
 
 @Composable
-private fun ChangesScreen(beneficiaries: List<Beneficiary>, deliveries: List<FoodDelivery>, onBack: () -> Unit, modifier: Modifier = Modifier) {
-    Column(modifier.fillMaxSize().padding(14.dp)) {
-        PageHeader("كشف المتغيرات", onBack)
-        Text("ملخص بيانات السجل الحالي", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-        SummaryCard("إجمالي العوائل المسجلة", beneficiaries.size.toString())
-        SummaryCard("العوائل التي لديها عمليات تسليم", deliveries.map { it.cardNumber }.distinct().size.toString())
-        SummaryCard("عدد عمليات التسليم", deliveries.size.toString())
-        Text("ملاحظة: مقارنة قوائم شهرين واستخراج العوائل الوافدة والمغادرة تحتاج إلى استيراد ملفات القوائم في مرحلة قارئ PDF.", color = Color.DarkGray)
+
+private data class FamilyPair(
+    val old: PdfBeneficiaryRow,
+    val current: PdfBeneficiaryRow
+)
+
+private suspend fun readChangesPdf(
+    context: Context,
+    uri: android.net.Uri
+): List<PdfBeneficiaryRow> = withContext(Dispatchers.IO) {
+    PDFBoxResourceLoader.init(context)
+    val input = context.contentResolver.openInputStream(uri)
+        ?: throw Exception("تعذر فتح ملف PDF")
+
+    input.use { stream ->
+        PDDocument.load(stream).use { document ->
+            parsePdfFamilies(PDFTextStripper().getText(document))
+        }
     }
 }
+
+private fun normalizeFamilyName(value: String): String {
+    return value.trim()
+        .replace(Regex("\\s+"), "")
+        .replace("أ", "ا")
+        .replace("إ", "ا")
+        .replace("آ", "ا")
+        .replace("ى", "ي")
+        .lowercase(Locale.ROOT)
+}
+
+@Composable
+private fun ChangesScreen(
+    beneficiaries: List<Beneficiary>,
+    deliveries: List<FoodDelivery>,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    var oldFamilies by remember {
+        mutableStateOf<List<PdfBeneficiaryRow>>(emptyList())
+    }
+    var currentFamilies by remember {
+        mutableStateOf<List<PdfBeneficiaryRow>>(emptyList())
+    }
+
+    var oldFileName by remember { mutableStateOf("") }
+    var currentFileName by remember { mutableStateOf("") }
+    var loadingOld by remember { mutableStateOf(false) }
+    var loadingCurrent by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf("") }
+    var compared by remember { mutableStateOf(false) }
+
+    val oldPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            loadingOld = true
+            error = ""
+            compared = false
+            scope.launch {
+                try {
+                    oldFamilies = readChangesPdf(context, uri)
+                    oldFileName = uri.lastPathSegment ?: "القائمة السابقة"
+                    if (oldFamilies.isEmpty()) {
+                        error = "لم يتم استخراج بيانات من القائمة السابقة."
+                    }
+                } catch (e: Exception) {
+                    error = "خطأ في قراءة القائمة السابقة: ${e.message}"
+                } finally {
+                    loadingOld = false
+                }
+            }
+        }
+    }
+
+    val currentPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            loadingCurrent = true
+            error = ""
+            compared = false
+            scope.launch {
+                try {
+                    currentFamilies = readChangesPdf(context, uri)
+                    currentFileName = uri.lastPathSegment ?: "القائمة الحالية"
+                    if (currentFamilies.isEmpty()) {
+                        error = "لم يتم استخراج بيانات من القائمة الحالية."
+                    }
+                } catch (e: Exception) {
+                    error = "خطأ في قراءة القائمة الحالية: ${e.message}"
+                } finally {
+                    loadingCurrent = false
+                }
+            }
+        }
+    }
+
+    val oldCards = oldFamilies.groupBy { it.cardNumber }
+    val newCards = currentFamilies.groupBy { it.cardNumber }
+
+    val sharedCards = oldCards.keys.intersect(newCards.keys)
+
+    val pairs = mutableListOf<FamilyPair>()
+
+    sharedCards.forEach { card ->
+        val old = oldCards[card]?.singleOrNull()
+        val current = newCards[card]?.singleOrNull()
+
+        if (old != null && current != null) {
+            pairs.add(FamilyPair(old, current))
+        }
+    }
+
+    val unmatchedOld = oldFamilies.filter { family ->
+        family.cardNumber !in sharedCards
+    }.toMutableList()
+
+    val unmatchedCurrent = currentFamilies.filter { family ->
+        family.cardNumber !in sharedCards
+    }.toMutableList()
+
+    // اكتشاف تغيير رقم البطاقة بالاعتماد على اسم رب الأسرة
+    val oldNames = unmatchedOld.groupBy {
+        normalizeFamilyName(it.name)
+    }
+    val newNames = unmatchedCurrent.groupBy {
+        normalizeFamilyName(it.name)
+    }
+
+    val changedCards = mutableListOf<FamilyPair>()
+
+    oldNames.forEach { (name, oldList) ->
+        val newList = newNames[name]
+
+        if (
+            name.isNotBlank() &&
+            oldList.size == 1 &&
+            newList?.size == 1
+        ) {
+            val old = oldList.first()
+            val current = newList.first()
+
+            changedCards.add(FamilyPair(old, current))
+            unmatchedOld.remove(old)
+            unmatchedCurrent.remove(current)
+        }
+    }
+
+    val arrivals = unmatchedCurrent
+    val departures = unmatchedOld
+
+    val memberChanges = pairs.filter {
+        it.old.totalMembers != it.current.totalMembers
+    } + changedCards.filter {
+        it.old.totalMembers != it.current.totalMembers
+    }
+
+    // الحالات المكررة التي تحتاج إلى مراجعة
+    val reviewRows = mutableListOf<List<String>>()
+
+    currentFamilies.groupBy { it.cardNumber }
+        .filter { it.value.size > 1 }
+        .forEach { (card, list) ->
+            list.forEach {
+                reviewRows.add(
+                    listOf(it.name, card, "رقم البطاقة مكرر في القائمة الحالية")
+                )
+            }
+        }
+
+    currentFamilies.groupBy {
+        normalizeFamilyName(it.name)
+    }.filter {
+        it.key.isNotBlank() && it.value.size > 1
+    }.forEach { (_, list) ->
+        list.forEach {
+            reviewRows.add(
+                listOf(it.name, it.cardNumber, "اسم رب الأسرة مكرر ويحتاج إلى تدقيق")
+            )
+        }
+    }
+
+    Column(
+        modifier.fillMaxSize()
+            .padding(12.dp)
+            .verticalScroll(rememberScrollState())
+    ) {
+        PageHeader("كشف المتغيرات", onBack)
+
+        Spacer(Modifier.height(10.dp))
+
+        Card(
+            Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = Color(0xFF126B53)
+            )
+        ) {
+            Column(Modifier.padding(15.dp)) {
+                Text(
+                    "مقارنة القوائم التموينية",
+                    color = Color.White,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "اختر قائمة الشهر السابق وقائمة الشهر الحالي لاكتشاف المتغيرات.",
+                    color = Color.White
+                )
+            }
+        }
+
+        Spacer(Modifier.height(10.dp))
+
+        Button(
+            onClick = {
+                oldPicker.launch(arrayOf("application/pdf"))
+            },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !loadingOld
+        ) {
+            Text("📂 اختيار PDF للشهر السابق")
+        }
+
+        if (oldFileName.isNotBlank()) {
+            Text(
+                "القائمة السابقة: $oldFileName",
+                fontSize = 12.sp
+            )
+            Text(
+                "عدد العوائل: ${oldFamilies.size}",
+                color = Color(0xFF126B53)
+            )
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        Button(
+            onClick = {
+                currentPicker.launch(arrayOf("application/pdf"))
+            },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !loadingCurrent
+        ) {
+            Text("📂 اختيار PDF للشهر الحالي")
+        }
+
+        if (currentFileName.isNotBlank()) {
+            Text(
+                "القائمة الحالية: $currentFileName",
+                fontSize = 12.sp
+            )
+            Text(
+                "عدد العوائل: ${currentFamilies.size}",
+                color = Color(0xFF126B53)
+            )
+        }
+
+        if (loadingOld || loadingCurrent) {
+            Spacer(Modifier.height(12.dp))
+            CircularProgressIndicator()
+            Text("جارٍ قراءة ملف PDF...")
+        }
+
+        if (error.isNotBlank()) {
+            Spacer(Modifier.height(8.dp))
+            Text(error, color = Color.Red)
+        }
+
+        Spacer(Modifier.height(10.dp))
+
+        Button(
+            onClick = {
+                compared = true
+                error = ""
+            },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = oldFamilies.isNotEmpty() &&
+                currentFamilies.isNotEmpty() &&
+                !loadingOld && !loadingCurrent
+        ) {
+            Text("🔍 مقارنة القائمتين")
+        }
+
+        if (compared) {
+            Spacer(Modifier.height(12.dp))
+
+            Text(
+                "ملخص نتائج المقارنة",
+                fontSize = 19.sp,
+                fontWeight = FontWeight.Bold
+            )
+
+            SummaryCard("العوائل الوافدة", arrivals.size.toString())
+            SummaryCard("العوائل المغادرة", departures.size.toString())
+            SummaryCard("تغيير رقم البطاقة", changedCards.size.toString())
+            SummaryCard("زيادة أو نقصان الأفراد", memberChanges.size.toString())
+            SummaryCard("حالات تحتاج إلى مراجعة", reviewRows.size.toString())
+
+            Spacer(Modifier.height(12.dp))
+
+            ComparisonTable(
+                "1. العوائل الوافدة",
+                listOf("اسم رب الأسرة", "رقم البطاقة", "عدد الأفراد"),
+                arrivals.map {
+                    listOf(
+                        it.name,
+                        it.cardNumber,
+                        it.totalMembers.toString()
+                    )
+                }
+            )
+
+            ComparisonTable(
+                "2. العوائل المغادرة",
+                listOf("اسم رب الأسرة", "رقم البطاقة", "عدد الأفراد"),
+                departures.map {
+                    listOf(
+                        it.name,
+                        it.cardNumber,
+                        it.totalMembers.toString()
+                    )
+                }
+            )
+
+            ComparisonTable(
+                "3. تغيّر البطاقة التموينية",
+                listOf("اسم رب الأسرة", "الرقم القديم", "الرقم الجديد"),
+                changedCards.map {
+                    listOf(
+                        it.current.name,
+                        it.old.cardNumber,
+                        it.current.cardNumber
+                    )
+                }
+            )
+
+            ComparisonTable(
+                "4. زيادة ونقصان الأفراد",
+                listOf(
+                    "اسم رب الأسرة",
+                    "رقم البطاقة",
+                    "العدد السابق",
+                    "العدد الحالي",
+                    "المحجوبون"
+                ),
+                memberChanges.map {
+                    listOf(
+                        it.current.name,
+                        it.current.cardNumber,
+                        it.old.totalMembers.toString(),
+                        it.current.totalMembers.toString(),
+                        it.current.blockedMembers.toString()
+                    )
+                }
+            )
+
+            ComparisonTable(
+                "5. الحالات التي تحتاج إلى مراجعة",
+                listOf("اسم رب الأسرة", "رقم البطاقة", "سبب المراجعة"),
+                reviewRows
+            )
+        }
+    }
+}
+
+@Composable
+private fun ComparisonTable(
+    title: String,
+    headers: List<String>,
+    rows: List<List<String>>
+) {
+    Spacer(Modifier.height(12.dp))
+
+    Text(
+        title,
+        fontSize = 17.sp,
+        fontWeight = FontWeight.Bold,
+        color = Color(0xFF126B53)
+    )
+
+    Spacer(Modifier.height(6.dp))
+
+    if (rows.isEmpty()) {
+        Card(Modifier.fillMaxWidth()) {
+            Text(
+                "لا توجد بيانات في هذا القسم.",
+                Modifier.padding(12.dp),
+                color = Color.DarkGray
+            )
+        }
+        return
+    }
+
+    val cellWidth = 125.dp
+    val tableWidth = cellWidth * headers.size
+
+    Column(
+        Modifier.fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+    ) {
+        Column(Modifier.width(tableWidth)) {
+            Row(
+                Modifier.fillMaxWidth()
+                    .background(Color(0xFF126B53))
+            ) {
+                headers.forEach { header ->
+                    Box(
+                        Modifier.width(cellWidth).padding(6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            header,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            }
+
+            rows.forEachIndexed { index, row ->
+                val rowColor = if (index % 2 == 0) {
+                    Color.White
+                } else {
+                    Color(0xFFF0F3F6)
+                }
+
+                Row(
+                    Modifier.fillMaxWidth()
+                        .background(rowColor)
+                ) {
+                    headers.indices.forEach { column ->
+                        Box(
+                            Modifier.width(cellWidth)
+                                .padding(horizontal = 5.dp, vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                row.getOrElse(column) { "" },
+                                fontSize = 12.sp,
+                                color = Color.Black
+                            )
+                        }
+                    }
+                }
+
+                Divider(color = Color(0xFFD9DEE3))
+            }
+        }
+    }
+}
+
+
 
 @Composable
 private fun ReportsScreen(
