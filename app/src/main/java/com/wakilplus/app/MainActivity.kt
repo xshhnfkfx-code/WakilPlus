@@ -883,7 +883,7 @@ private fun MovementScreen(deliveries: List<FoodDelivery>, onBack: () -> Unit, m
     }
 }
 
-@Composable
+
 
 private data class FamilyPair(
     val old: PdfBeneficiaryRow,
