@@ -1172,46 +1172,255 @@ var expandedSection by remember { mutableStateOf("") }
             Text("🔍 مقارنة القائمتين")
         }
 
-        if (compared) {
-            Spacer(Modifier.height(12.dp))
 
+if (compared) {
+    Spacer(Modifier.height(12.dp))
+
+    Text(
+        "نتائج مقارنة القوائم",
+        fontSize = 20.sp,
+        fontWeight = FontWeight.Bold,
+        color = Color(0xFF126B53)
+    )
+
+    Spacer(Modifier.height(8.dp))
+
+    // العوائل الوافدة
+    Card(
+        Modifier.fillMaxWidth().padding(vertical = 4.dp)
+            .clickable {
+                expandedSection =
+                    if (expandedSection == "arrivals") "" else "arrivals"
+            },
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White
+        ),
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                Modifier.size(48.dp)
+                    .background(
+                        Color(0xFFE1F2E9),
+                        RoundedCornerShape(10.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    arrivals.size.toString(),
+                    color = Color(0xFF126B53),
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(Modifier.width(12.dp))
             Text(
-                "ملخص نتائج المقارنة",
-                fontSize = 19.sp,
-                fontWeight = FontWeight.Bold
+                "العوائل الوافدة",
+                Modifier.weight(1f),
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp
             )
-
-            SummaryCard("العوائل الوافدة", arrivals.size.toString())
-            SummaryCard("العوائل المغادرة", departures.size.toString())
-            SummaryCard("تغيير رقم البطاقة", changedCards.size.toString())
-            SummaryCard("زيادة أو نقصان الأفراد", memberChanges.size.toString())
-            SummaryCard("حالات تحتاج إلى مراجعة", reviewRows.size.toString())
-
-            Spacer(Modifier.height(12.dp))
-
-            ComparisonTable(
-                "1. العوائل الوافدة",
-                listOf("اسم رب الأسرة", "رقم البطاقة", "عدد الأفراد"),
-                arrivals.map {
-                    listOf(
-                        it.name,
-                        it.cardNumber,
-                        it.totalMembers.toString()
-                    )
-                }
+            Text(
+                if (expandedSection == "arrivals") "⌃" else "›",
+                fontSize = 25.sp,
+                color = Color(0xFF126B53)
             )
+        }
+    }
 
-            ComparisonTable(
-                "2. العوائل المغادرة",
-                listOf("اسم رب الأسرة", "رقم البطاقة", "عدد الأفراد"),
-                departures.map {
-                    listOf(
-                        it.name,
-                        it.cardNumber,
-                        it.totalMembers.toString()
-                    )
-                }
-            )
+    if (expandedSection == "arrivals") {
+        ComparisonTable(
+            "تفاصيل العوائل الوافدة",
+            listOf("اسم رب الأسرة", "رقم البطاقة", "عدد الأفراد"),
+            arrivals.map {
+                listOf(it.name, it.cardNumber, it.totalMembers.toString())
+            }
+        )
+    }
+
+    // العوائل المغادرة
+    Card(
+        Modifier.fillMaxWidth().padding(vertical = 4.dp)
+            .clickable {
+                expandedSection =
+                    if (expandedSection == "departures") "" else "departures"
+            },
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                Modifier.size(48.dp)
+                    .background(Color(0xFFE1F2E9), RoundedCornerShape(10.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    departures.size.toString(),
+                    color = Color(0xFF126B53),
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Text("العوائل المغادرة", Modifier.weight(1f),
+                fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Text(if (expandedSection == "departures") "⌃" else "›",
+                fontSize = 25.sp, color = Color(0xFF126B53))
+        }
+    }
+
+    if (expandedSection == "departures") {
+        ComparisonTable(
+            "تفاصيل العوائل المغادرة",
+            listOf("اسم رب الأسرة", "رقم البطاقة", "عدد الأفراد"),
+            departures.map {
+                listOf(it.name, it.cardNumber, it.totalMembers.toString())
+            }
+        )
+    }
+
+    // تغيير البطاقة
+    Card(
+        Modifier.fillMaxWidth().padding(vertical = 4.dp)
+            .clickable {
+                expandedSection =
+                    if (expandedSection == "changed") "" else "changed"
+            },
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                Modifier.size(48.dp)
+                    .background(Color(0xFFE1F2E9), RoundedCornerShape(10.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    changedCards.size.toString(),
+                    color = Color(0xFF126B53),
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Text("تغيير رقم البطاقة التموينية", Modifier.weight(1f),
+                fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            Text(if (expandedSection == "changed") "⌃" else "›",
+                fontSize = 25.sp, color = Color(0xFF126B53))
+        }
+    }
+
+    if (expandedSection == "changed") {
+        ComparisonTable(
+            "تفاصيل تغيير البطاقة",
+            listOf("اسم رب الأسرة", "الرقم القديم", "الرقم الجديد"),
+            changedCards.map {
+                listOf(it.current.name, it.old.cardNumber, it.current.cardNumber)
+            }
+        )
+    }
+
+    // زيادة ونقصان الأفراد
+    Card(
+        Modifier.fillMaxWidth().padding(vertical = 4.dp)
+            .clickable {
+                expandedSection =
+                    if (expandedSection == "members") "" else "members"
+            },
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                Modifier.size(48.dp)
+                    .background(Color(0xFFE1F2E9), RoundedCornerShape(10.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    memberChanges.size.toString(),
+                    color = Color(0xFF126B53),
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Text("زيادة أو نقصان الأفراد", Modifier.weight(1f),
+                fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            Text(if (expandedSection == "members") "⌃" else "›",
+                fontSize = 25.sp, color = Color(0xFF126B53))
+        }
+    }
+
+    if (expandedSection == "members") {
+        ComparisonTable(
+            "تفاصيل زيادة ونقصان الأفراد",
+            listOf("اسم رب الأسرة", "رقم البطاقة", "العدد السابق", "العدد الحالي", "المحجوبون"),
+            memberChanges.map {
+                listOf(
+                    it.current.name,
+                    it.current.cardNumber,
+                    it.old.totalMembers.toString(),
+                    it.current.totalMembers.toString(),
+                    it.current.blockedMembers.toString()
+                )
+            }
+        )
+    }
+
+    // الحالات التي تحتاج إلى مراجعة
+    Card(
+        Modifier.fillMaxWidth().padding(vertical = 4.dp)
+            .clickable {
+                expandedSection =
+                    if (expandedSection == "review") "" else "review"
+            },
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                Modifier.size(48.dp)
+                    .background(Color(0xFFFFF0D9), RoundedCornerShape(10.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    reviewRows.size.toString(),
+                    color = Color(0xFFB7791F),
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Text("حالات تحتاج إلى مراجعة", Modifier.weight(1f),
+                fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            Text(if (expandedSection == "review") "⌃" else "›",
+                fontSize = 25.sp, color = Color(0xFF126B53))
+        }
+    }
+
+    if (expandedSection == "review") {
+        ComparisonTable(
+            "تفاصيل الحالات التي تحتاج إلى مراجعة",
+            listOf("اسم رب الأسرة", "رقم البطاقة", "سبب المراجعة"),
+            reviewRows
+        )
+    }
+}
 
             ComparisonTable(
                 "3. تغيّر البطاقة التموينية",
