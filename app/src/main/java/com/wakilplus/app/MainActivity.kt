@@ -915,6 +915,7 @@ private fun normalizeFamilyName(value: String): String {
         .lowercase(Locale.ROOT)
 }
 
+
 @Composable
 private fun ChangesScreen(
     beneficiaries: List<Beneficiary>,
@@ -938,7 +939,8 @@ private fun ChangesScreen(
     var loadingCurrent by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
     var compared by remember { mutableStateOf(false) }
-var expandedSection by remember { mutableStateOf("") }
+    var expandedSection by remember { mutableStateOf("") }
+
     val oldPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -946,10 +948,13 @@ var expandedSection by remember { mutableStateOf("") }
             loadingOld = true
             error = ""
             compared = false
+            expandedSection = ""
+
             scope.launch {
                 try {
                     oldFamilies = readChangesPdf(context, uri)
                     oldFileName = uri.lastPathSegment ?: "القائمة السابقة"
+
                     if (oldFamilies.isEmpty()) {
                         error = "لم يتم استخراج بيانات من القائمة السابقة."
                     }
@@ -969,10 +974,13 @@ var expandedSection by remember { mutableStateOf("") }
             loadingCurrent = true
             error = ""
             compared = false
+            expandedSection = ""
+
             scope.launch {
                 try {
                     currentFamilies = readChangesPdf(context, uri)
                     currentFileName = uri.lastPathSegment ?: "القائمة الحالية"
+
                     if (currentFamilies.isEmpty()) {
                         error = "لم يتم استخراج بيانات من القائمة الحالية."
                     }
@@ -987,7 +995,6 @@ var expandedSection by remember { mutableStateOf("") }
 
     val oldCards = oldFamilies.groupBy { it.cardNumber }
     val newCards = currentFamilies.groupBy { it.cardNumber }
-
     val sharedCards = oldCards.keys.intersect(newCards.keys)
 
     val pairs = mutableListOf<FamilyPair>()
@@ -1001,18 +1008,18 @@ var expandedSection by remember { mutableStateOf("") }
         }
     }
 
-    val unmatchedOld = oldFamilies.filter { family ->
-        family.cardNumber !in sharedCards
+    val unmatchedOld = oldFamilies.filter {
+        it.cardNumber !in sharedCards
     }.toMutableList()
 
-    val unmatchedCurrent = currentFamilies.filter { family ->
-        family.cardNumber !in sharedCards
+    val unmatchedCurrent = currentFamilies.filter {
+        it.cardNumber !in sharedCards
     }.toMutableList()
 
-    // اكتشاف تغيير رقم البطاقة بالاعتماد على اسم رب الأسرة
     val oldNames = unmatchedOld.groupBy {
         normalizeFamilyName(it.name)
     }
+
     val newNames = unmatchedCurrent.groupBy {
         normalizeFamilyName(it.name)
     }
@@ -1022,11 +1029,7 @@ var expandedSection by remember { mutableStateOf("") }
     oldNames.forEach { (name, oldList) ->
         val newList = newNames[name]
 
-        if (
-            name.isNotBlank() &&
-            oldList.size == 1 &&
-            newList?.size == 1
-        ) {
+        if (name.isNotBlank() && oldList.size == 1 && newList?.size == 1) {
             val old = oldList.first()
             val current = newList.first()
 
@@ -1038,14 +1041,90 @@ var expandedSection by remember { mutableStateOf("") }
 
     val arrivals = unmatchedCurrent
     val departures = unmatchedOld
+    val allPairs = pairs + changedCards
 
-    val memberChanges = pairs.filter {
-        it.old.totalMembers != it.current.totalMembers
-    } + changedCards.filter {
-        it.old.totalMembers != it.current.totalMembers
+    // إضافة أفراد مستحقين جدد
+    val addedMembers = allPairs.filter {
+        it.current.eligibleMembers > it.old.eligibleMembers
     }
 
-    // الحالات المكررة التي تحتاج إلى مراجعة
+    val addedCount = addedMembers.sumOf {
+        (it.current.eligibleMembers - it.old.eligibleMembers).coerceAtLeast(0)
+    }
+
+    // نقل أو حذف أفراد مستحقين
+    val removedMembers = allPairs.filter {
+        it.current.eligibleMembers < it.old.eligibleMembers
+    }
+
+    val removedCount = removedMembers.sumOf {
+        (it.old.eligibleMembers - it.current.eligibleMembers).coerceAtLeast(0)
+    }
+
+    // رفع الحجب
+    val unblockedFamilies = allPairs.filter {
+        it.old.blockedMembers > it.current.blockedMembers
+    }
+
+    val unblockedCount = unblockedFamilies.sumOf {
+        (it.old.blockedMembers - it.current.blockedMembers).coerceAtLeast(0)
+    }
+
+    // العوائل المحجوبة
+    val blockedFamilies = currentFamilies.filter {
+        it.blockedMembers > 0
+    }
+
+    // اكتشاف انشطار العائلة: البطاقة القديمة باقية وظهرت بطاقة إضافية بالاسم نفسه
+    val splitRows = mutableListOf<List<String>>()
+
+    val oldByName = oldFamilies.groupBy {
+        normalizeFamilyName(it.name)
+    }
+
+    val currentByName = currentFamilies.groupBy {
+        normalizeFamilyName(it.name)
+    }
+
+    oldByName.forEach { (name, oldList) ->
+        val newList = currentByName[name]
+
+        if (name.isNotBlank() && oldList.size == 1 && newList != null && newList.size > 1) {
+            val old = oldList.first()
+
+            newList.filter { it.cardNumber != old.cardNumber }.forEach {
+                splitRows.add(
+                    listOf(it.name, old.cardNumber, it.cardNumber)
+                )
+            }
+        }
+    }
+
+    // الأفراد الذين لا يظهر لهم استحقاق بحسب فرق الأعداد
+    fun withoutShare(family: PdfBeneficiaryRow): Int {
+        return (
+            family.totalMembers -
+                family.eligibleMembers -
+                family.blockedMembers
+            ).coerceAtLeast(0)
+    }
+
+    val withoutSharePairs = allPairs.filter {
+        withoutShare(it.current) > withoutShare(it.old)
+    }
+
+    val withoutShareCount = withoutSharePairs.sumOf {
+        (withoutShare(it.current) - withoutShare(it.old)).coerceAtLeast(0)
+    }
+
+    // العوائل التي لم يتغير وضعها
+    val unchangedFamilies = pairs.filter {
+        it.old.totalMembers == it.current.totalMembers &&
+            it.old.eligibleMembers == it.current.eligibleMembers &&
+            it.old.blockedMembers == it.current.blockedMembers
+    }
+
+    // حالات المراجعة
     val reviewRows = mutableListOf<List<String>>()
 
     currentFamilies.groupBy { it.cardNumber }
@@ -1072,6 +1151,7 @@ var expandedSection by remember { mutableStateOf("") }
 
     Column(
         modifier.fillMaxSize()
+            .background(Color(0xFFF7FAF2))
             .padding(12.dp)
             .verticalScroll(rememberScrollState())
     ) {
@@ -1083,7 +1163,8 @@ var expandedSection by remember { mutableStateOf("") }
             Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
                 containerColor = Color(0xFF126B53)
-            )
+            ),
+            shape = RoundedCornerShape(18.dp)
         ) {
             Column(Modifier.padding(15.dp)) {
                 Text(
@@ -1112,10 +1193,7 @@ var expandedSection by remember { mutableStateOf("") }
         }
 
         if (oldFileName.isNotBlank()) {
-            Text(
-                "القائمة السابقة: $oldFileName",
-                fontSize = 12.sp
-            )
+            Text("القائمة السابقة: $oldFileName", fontSize = 12.sp)
             Text(
                 "عدد العوائل: ${oldFamilies.size}",
                 color = Color(0xFF126B53)
@@ -1135,10 +1213,7 @@ var expandedSection by remember { mutableStateOf("") }
         }
 
         if (currentFileName.isNotBlank()) {
-            Text(
-                "القائمة الحالية: $currentFileName",
-                fontSize = 12.sp
-            )
+            Text("القائمة الحالية: $currentFileName", fontSize = 12.sp)
             Text(
                 "عدد العوائل: ${currentFamilies.size}",
                 color = Color(0xFF126B53)
@@ -1161,6 +1236,7 @@ var expandedSection by remember { mutableStateOf("") }
         Button(
             onClick = {
                 compared = true
+                expandedSection = ""
                 error = ""
             },
             modifier = Modifier.fillMaxWidth(),
@@ -1171,296 +1247,327 @@ var expandedSection by remember { mutableStateOf("") }
             Text("🔍 مقارنة القائمتين")
         }
 
+        if (compared) {
+            Spacer(Modifier.height(18.dp))
 
-if (compared) {
-    Spacer(Modifier.height(12.dp))
+            Text(
+                "المتغيرات حسب النوع",
+                fontSize = 21.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF285D32)
+            )
 
-    Text(
-        "نتائج مقارنة القوائم",
-        fontSize = 20.sp,
-        fontWeight = FontWeight.Bold,
-        color = Color(0xFF126B53)
-    )
+            Spacer(Modifier.height(10.dp))
 
-    Spacer(Modifier.height(8.dp))
+            ChangeSummaryCard(
+                "إضافة فرد مستحق جديد",
+                addedCount,
+                expandedSection == "added"
+            ) {
+                expandedSection = if (expandedSection == "added") "" else "added"
+            }
 
-    // العوائل الوافدة
+            if (expandedSection == "added") {
+                ComparisonTable(
+                    "تفاصيل الأفراد المستحقين الجدد",
+                    listOf("اسم رب الأسرة", "رقم البطاقة", "السابق", "الحالي", "الزيادة"),
+                    addedMembers.map {
+                        listOf(
+                            it.current.name,
+                            it.current.cardNumber,
+                            it.old.eligibleMembers.toString(),
+                            it.current.eligibleMembers.toString(),
+                            (it.current.eligibleMembers - it.old.eligibleMembers).toString()
+                        )
+                    }
+                )
+            }
+
+            ChangeSummaryCard(
+                "نقل أو حذف أفراد مستحقين",
+                removedCount,
+                expandedSection == "removed"
+            ) {
+                expandedSection = if (expandedSection == "removed") "" else "removed"
+            }
+
+            if (expandedSection == "removed") {
+                ComparisonTable(
+                    "تفاصيل الأفراد المحذوفين أو المنقولين",
+                    listOf("اسم رب الأسرة", "رقم البطاقة", "السابق", "الحالي", "النقص"),
+                    removedMembers.map {
+                        listOf(
+                            it.current.name,
+                            it.current.cardNumber,
+                            it.old.eligibleMembers.toString(),
+                            it.current.eligibleMembers.toString(),
+                            (it.old.eligibleMembers - it.current.eligibleMembers).toString()
+                        )
+                    }
+                )
+            }
+
+            ChangeSummaryCard(
+                "رفع الحجب عن فرد",
+                unblockedCount,
+                expandedSection == "unblocked"
+            ) {
+                expandedSection = if (expandedSection == "unblocked") "" else "unblocked"
+            }
+
+            if (expandedSection == "unblocked") {
+                ComparisonTable(
+                    "تفاصيل رفع الحجب",
+                    listOf("اسم رب الأسرة", "رقم البطاقة", "المحجوب سابقاً", "المحجوب حالياً", "رفع الحجب"),
+                    unblockedFamilies.map {
+                        listOf(
+                            it.current.name,
+                            it.current.cardNumber,
+                            it.old.blockedMembers.toString(),
+                            it.current.blockedMembers.toString(),
+                            (it.old.blockedMembers - it.current.blockedMembers).toString()
+                        )
+                    }
+                )
+            }
+
+            ChangeSummaryCard(
+                "حجب عائلة / عائلة محجوبة",
+                blockedFamilies.size,
+                expandedSection == "blocked"
+            ) {
+                expandedSection = if (expandedSection == "blocked") "" else "blocked"
+            }
+
+            if (expandedSection == "blocked") {
+                ComparisonTable(
+                    "تفاصيل العوائل التي لديها أفراد محجوبون",
+                    listOf("اسم رب الأسرة", "رقم البطاقة", "الأفراد المحجوبون"),
+                    blockedFamilies.map {
+                        listOf(it.name, it.cardNumber, it.blockedMembers.toString())
+                    }
+                )
+            }
+
+            ChangeSummaryCard(
+                "قدوم عائلة إلى الوكيل",
+                arrivals.size,
+                expandedSection == "arrivals"
+            ) {
+                expandedSection = if (expandedSection == "arrivals") "" else "arrivals"
+            }
+
+            if (expandedSection == "arrivals") {
+                ComparisonTable(
+                    "تفاصيل العوائل الوافدة",
+                    listOf("اسم رب الأسرة", "رقم البطاقة", "عدد الأفراد"),
+                    arrivals.map {
+                        listOf(it.name, it.cardNumber, it.totalMembers.toString())
+                    }
+                )
+            }
+
+            ChangeSummaryCard(
+                "نقل أو حذف عائلة من الوكيل",
+                departures.size,
+                expandedSection == "departures"
+            ) {
+                expandedSection = if (expandedSection == "departures") "" else "departures"
+            }
+
+            if (expandedSection == "departures") {
+                ComparisonTable(
+                    "تفاصيل العوائل المغادرة",
+                    listOf("اسم رب الأسرة", "رقم البطاقة", "عدد الأفراد"),
+                    departures.map {
+                        listOf(it.name, it.cardNumber, it.totalMembers.toString())
+                    }
+                )
+            }
+
+            ChangeSummaryCard(
+                "انشطار عائلة حلت محلها عائلة بنفس الاسم",
+                splitRows.size,
+                expandedSection == "split"
+            ) {
+                expandedSection = if (expandedSection == "split") "" else "split"
+            }
+
+            if (expandedSection == "split") {
+                ComparisonTable(
+                    "تفاصيل العوائل المنقسمة",
+                    listOf("اسم رب الأسرة", "البطاقة القديمة", "البطاقة الجديدة"),
+                    splitRows
+                )
+            }
+
+            ChangeSummaryCard(
+                "تغير رقم بطاقة العائلة",
+                changedCards.size,
+                expandedSection == "changed"
+            ) {
+                expandedSection = if (expandedSection == "changed") "" else "changed"
+            }
+
+            if (expandedSection == "changed") {
+                ComparisonTable(
+                    "تفاصيل تغيير رقم البطاقة",
+                    listOf("اسم رب الأسرة", "الرقم القديم", "الرقم الجديد"),
+                    changedCards.map {
+                        listOf(it.current.name, it.old.cardNumber, it.current.cardNumber)
+                    }
+                )
+            }
+
+            ChangeSummaryCard(
+                "إضافة أطفال رضع / أفراد دون حصة",
+                withoutShareCount,
+                expandedSection == "withoutShare"
+            ) {
+                expandedSection = if (expandedSection == "withoutShare") "" else "withoutShare"
+            }
+
+            if (expandedSection == "withoutShare") {
+                ComparisonTable(
+                    "تفاصيل الأفراد دون حصة بحسب فرق الأعداد",
+                    listOf("اسم رب الأسرة", "رقم البطاقة", "السابق", "الحالي", "الزيادة"),
+                    withoutSharePairs.map {
+                        listOf(
+                            it.current.name,
+                            it.current.cardNumber,
+                            withoutShare(it.old).toString(),
+                            withoutShare(it.current).toString(),
+                            (withoutShare(it.current) - withoutShare(it.old)).toString()
+                        )
+                    }
+                )
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            Card(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(22.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFFF0F0F0)
+                )
+            ) {
+                Row(
+                    Modifier.fillMaxWidth().padding(17.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        Modifier.size(48.dp)
+                            .background(
+                                Color(0xFFDDDDDD),
+                                RoundedCornerShape(15.dp)
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            unchangedFamilies.size.toString(),
+                            color = Color.DarkGray,
+                            fontSize = 19.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Spacer(Modifier.width(12.dp))
+
+                    Text(
+                        "مستبعد: لا يوجد تغيير",
+                        Modifier.weight(1f),
+                        fontSize = 16.sp,
+                        color = Color.Gray
+                    )
+
+                    Text("—", color = Color.Gray, fontSize = 22.sp)
+                }
+            }
+
+            if (expandedSection == "unchanged") {
+                ComparisonTable(
+                    "العوائل التي لم تتغير",
+                    listOf("اسم رب الأسرة", "رقم البطاقة", "عدد الأفراد"),
+                    unchangedFamilies.map {
+                        listOf(
+                            it.current.name,
+                            it.current.cardNumber,
+                            it.current.totalMembers.toString()
+                        )
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChangeSummaryCard(
+    title: String,
+    count: Int,
+    expanded: Boolean,
+    onClick: () -> Unit
+) {
     Card(
-        Modifier.fillMaxWidth().padding(vertical = 4.dp)
-            .clickable {
-                expandedSection =
-                    if (expandedSection == "arrivals") "" else "arrivals"
-            },
+        Modifier.fillMaxWidth()
+            .padding(vertical = 6.dp)
+            .clickable { onClick() },
+        shape = RoundedCornerShape(23.dp),
         colors = CardDefaults.cardColors(
             containerColor = Color.White
         ),
-        elevation = CardDefaults.cardElevation(2.dp)
+        elevation = CardDefaults.cardElevation(1.dp)
     ) {
         Row(
-            Modifier.fillMaxWidth().padding(14.dp),
+            Modifier.fillMaxWidth().heightIn(min = 82.dp).padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Text(
+                if (expanded) "−" else "›",
+                color = Color(0xFF999999),
+                fontSize = 27.sp
+            )
+
+            Spacer(Modifier.width(12.dp))
+
+            Text(
+                title,
+                Modifier.weight(1f),
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+                color = Color(0xFF202020)
+            )
+
+            Spacer(Modifier.width(10.dp))
+
             Box(
-                Modifier.size(48.dp)
+                Modifier.size(60.dp)
                     .background(
-                        Color(0xFFE1F2E9),
-                        RoundedCornerShape(10.dp)
+                        Color(0xFFEAF2EA),
+                        RoundedCornerShape(19.dp)
                     ),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    arrivals.size.toString(),
-                    color = Color(0xFF126B53),
-                    fontSize = 19.sp,
+                    count.toString(),
+                    color = Color(0xFF285D32),
+                    fontSize = 20.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
-            Spacer(Modifier.width(12.dp))
-            Text(
-                "العوائل الوافدة",
-                Modifier.weight(1f),
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp
-            )
-            Text(
-                if (expandedSection == "arrivals") "⌃" else "›",
-                fontSize = 25.sp,
-                color = Color(0xFF126B53)
-            )
         }
-    }
-
-    if (expandedSection == "arrivals") {
-        ComparisonTable(
-            "تفاصيل العوائل الوافدة",
-            listOf("اسم رب الأسرة", "رقم البطاقة", "عدد الأفراد"),
-            arrivals.map {
-                listOf(it.name, it.cardNumber, it.totalMembers.toString())
-            }
-        )
-    }
-
-    // العوائل المغادرة
-    Card(
-        Modifier.fillMaxWidth().padding(vertical = 4.dp)
-            .clickable {
-                expandedSection =
-                    if (expandedSection == "departures") "" else "departures"
-            },
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(2.dp)
-    ) {
-        Row(
-            Modifier.fillMaxWidth().padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                Modifier.size(48.dp)
-                    .background(Color(0xFFE1F2E9), RoundedCornerShape(10.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    departures.size.toString(),
-                    color = Color(0xFF126B53),
-                    fontSize = 19.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            Spacer(Modifier.width(12.dp))
-            Text("العوائل المغادرة", Modifier.weight(1f),
-                fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            Text(if (expandedSection == "departures") "⌃" else "›",
-                fontSize = 25.sp, color = Color(0xFF126B53))
-        }
-    }
-
-    if (expandedSection == "departures") {
-        ComparisonTable(
-            "تفاصيل العوائل المغادرة",
-            listOf("اسم رب الأسرة", "رقم البطاقة", "عدد الأفراد"),
-            departures.map {
-                listOf(it.name, it.cardNumber, it.totalMembers.toString())
-            }
-        )
-    }
-
-    // تغيير البطاقة
-    Card(
-        Modifier.fillMaxWidth().padding(vertical = 4.dp)
-            .clickable {
-                expandedSection =
-                    if (expandedSection == "changed") "" else "changed"
-            },
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(2.dp)
-    ) {
-        Row(
-            Modifier.fillMaxWidth().padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                Modifier.size(48.dp)
-                    .background(Color(0xFFE1F2E9), RoundedCornerShape(10.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    changedCards.size.toString(),
-                    color = Color(0xFF126B53),
-                    fontSize = 19.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            Spacer(Modifier.width(12.dp))
-            Text("تغيير رقم البطاقة التموينية", Modifier.weight(1f),
-                fontWeight = FontWeight.Bold, fontSize = 15.sp)
-            Text(if (expandedSection == "changed") "⌃" else "›",
-                fontSize = 25.sp, color = Color(0xFF126B53))
-        }
-    }
-
-    if (expandedSection == "changed") {
-        ComparisonTable(
-            "تفاصيل تغيير البطاقة",
-            listOf("اسم رب الأسرة", "الرقم القديم", "الرقم الجديد"),
-            changedCards.map {
-                listOf(it.current.name, it.old.cardNumber, it.current.cardNumber)
-            }
-        )
-    }
-
-    // زيادة ونقصان الأفراد
-    Card(
-        Modifier.fillMaxWidth().padding(vertical = 4.dp)
-            .clickable {
-                expandedSection =
-                    if (expandedSection == "members") "" else "members"
-            },
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(2.dp)
-    ) {
-        Row(
-            Modifier.fillMaxWidth().padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                Modifier.size(48.dp)
-                    .background(Color(0xFFE1F2E9), RoundedCornerShape(10.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    memberChanges.size.toString(),
-                    color = Color(0xFF126B53),
-                    fontSize = 19.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            Spacer(Modifier.width(12.dp))
-            Text("زيادة أو نقصان الأفراد", Modifier.weight(1f),
-                fontWeight = FontWeight.Bold, fontSize = 15.sp)
-            Text(if (expandedSection == "members") "⌃" else "›",
-                fontSize = 25.sp, color = Color(0xFF126B53))
-        }
-    }
-
-    if (expandedSection == "members") {
-        ComparisonTable(
-            "تفاصيل زيادة ونقصان الأفراد",
-            listOf("اسم رب الأسرة", "رقم البطاقة", "العدد السابق", "العدد الحالي", "المحجوبون"),
-            memberChanges.map {
-                listOf(
-                    it.current.name,
-                    it.current.cardNumber,
-                    it.old.totalMembers.toString(),
-                    it.current.totalMembers.toString(),
-                    it.current.blockedMembers.toString()
-                )
-            }
-        )
-    }
-
-    // الحالات التي تحتاج إلى مراجعة
-    Card(
-        Modifier.fillMaxWidth().padding(vertical = 4.dp)
-            .clickable {
-                expandedSection =
-                    if (expandedSection == "review") "" else "review"
-            },
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(2.dp)
-    ) {
-        Row(
-            Modifier.fillMaxWidth().padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                Modifier.size(48.dp)
-                    .background(Color(0xFFFFF0D9), RoundedCornerShape(10.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    reviewRows.size.toString(),
-                    color = Color(0xFFB7791F),
-                    fontSize = 19.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            Spacer(Modifier.width(12.dp))
-            Text("حالات تحتاج إلى مراجعة", Modifier.weight(1f),
-                fontWeight = FontWeight.Bold, fontSize = 15.sp)
-            Text(if (expandedSection == "review") "⌃" else "›",
-                fontSize = 25.sp, color = Color(0xFF126B53))
-        }
-    }
-
-    if (expandedSection == "review") {
-        ComparisonTable(
-            "تفاصيل الحالات التي تحتاج إلى مراجعة",
-            listOf("اسم رب الأسرة", "رقم البطاقة", "سبب المراجعة"),
-            reviewRows
-        )
     }
 }
 
-            ComparisonTable(
-                "3. تغيّر البطاقة التموينية",
-                listOf("اسم رب الأسرة", "الرقم القديم", "الرقم الجديد"),
-                changedCards.map {
-                    listOf(
-                        it.current.name,
-                        it.old.cardNumber,
-                        it.current.cardNumber
-                    )
-                }
-            )
 
-            ComparisonTable(
-                "4. زيادة ونقصان الأفراد",
-                listOf(
-                    "اسم رب الأسرة",
-                    "رقم البطاقة",
-                    "العدد السابق",
-                    "العدد الحالي",
-                    "المحجوبون"
-                ),
-                memberChanges.map {
-                    listOf(
-                        it.current.name,
-                        it.current.cardNumber,
-                        it.old.totalMembers.toString(),
-                        it.current.totalMembers.toString(),
-                        it.current.blockedMembers.toString()
-                    )
-                }
-            )
-
-            ComparisonTable(
-                "5. الحالات التي تحتاج إلى مراجعة",
-                listOf("اسم رب الأسرة", "رقم البطاقة", "سبب المراجعة"),
-                reviewRows
-            )
-        }
-    }
-
+    
+        
+            
+                    
+        
+             
+            
 @Composable
 private fun ComparisonTable(
     title: String,
