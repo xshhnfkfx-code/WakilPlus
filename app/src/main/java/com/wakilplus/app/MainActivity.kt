@@ -938,7 +938,8 @@ private fun ChangesScreen(
     var loadingCurrent by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
     var compared by remember { mutableStateOf(false) }
-
+    var compared by remember { mutableStateOf(false) }
+var expandedSection by remember { mutableStateOf("") }
     val oldPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
