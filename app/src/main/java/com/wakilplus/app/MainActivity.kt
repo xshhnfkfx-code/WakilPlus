@@ -915,7 +915,7 @@ private fun normalizeFamilyName(value: String): String {
         .lowercase(Locale.ROOT)
 }
 
-
+   
 @Composable
 private fun ChangesScreen(
     beneficiaries: List<Beneficiary>,
@@ -1560,14 +1560,6 @@ private fun ChangeSummaryCard(
     }
 }
 
-
-    
-        
-            
-                    
-        
-             
-            
 @Composable
 private fun ComparisonTable(
     title: String,
