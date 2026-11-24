@@ -1460,7 +1460,6 @@ if (compared) {
             )
         }
     }
-}
 
 @Composable
 private fun ComparisonTable(
